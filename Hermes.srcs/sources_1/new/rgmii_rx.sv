@@ -50,7 +50,8 @@ always_ff @(posedge rxclk) begin
 end
 
 logic rx_er;
-assign rx_er = ctl_rise ^ ctl_fall;
+// assign rx_er = ctl_rise ^ ctl_fall;
+always_ff @(posedge rxclk) rx_er <= ctl_rise ^ ctl_fall; //combinational would be 1 cycle ahead
 
 //state machine:
 //preamble: 0x55?? check*
