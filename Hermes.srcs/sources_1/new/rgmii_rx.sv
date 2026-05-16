@@ -44,5 +44,52 @@ logic [7:0] rawdata;
 logic rawvalid;
 //cant put it directly bc we have to make sure valid and no errors
 
+always_ff @(posedge rxclk) begin
+    rawdata <= {rxd_rise, rxd_fall};
+    rawvalid <= ctl_rise;
+end
 
+logic rx_er;
+assign rx_er = ctl_rise ^ ctl_fall;
+
+//state machine:
+//preamble: 0xAA
+//idle: waiting for frame
+//active: real data
+typedef enum logic [1:0] {
+    idle, preamble, active
+} state_t;
+
+state_t curr;
+
+always_ff @(posedge rxclk) begin
+    valid <= 0;
+    frame_active <= 0; //defaults
+    
+    case(curr)
+        idle: begin
+            if(rawvalid && rawdata == 8'h55) curr <= preamble;
+        end
+        
+        preamble: begin
+            if(!rawvalid) curr <= idle; //never got to SFD (0xD5)
+            else if(rawdata == 8'hD5) begin
+                curr <= active;
+                frame_active <= 1;
+            end //still 0x55 so still preamble
+        end
+        
+        active: begin
+            if(!rawvalid) curr <= idle; //frame over? i think *check
+            else if(rx_er) begin
+                curr <= idle; //erred out
+                valid <= 0;
+            end else begin
+                data <= rawdata;
+                valid <= 1;
+                frame_active <= 1;
+            end       
+        end
+    endcase    
+end
 endmodule
