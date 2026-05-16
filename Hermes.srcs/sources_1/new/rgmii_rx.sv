@@ -25,7 +25,7 @@ module rgmii_rx(output logic [7:0] data, output logic valid, output logic frame_
                 
 //need to capture on both edges - use IDDR
 logic [3:0] rxd_rise, rxd_fall;
-logic ctlrise, ctlfall;
+logic ctl_rise, ctl_fall;
 
 genvar i;
 generate
@@ -33,10 +33,10 @@ generate
         IDDR #(.DDR_CLK_EDGE("SAME_EDGE_PIPELINED"), .INIT_Q1(0), .INIT_Q2(0))
         iddr_rx (.C(rxclk), .CE(1), .D(rxd[i]), .Q1(rxd_rise[i]), .Q2(rxd_fall[i]), .R(0), .S(0));
     end
-endgenerate;
+endgenerate
 
 IDDR #(.DDR_CLK_EDGE("SAME_EDGE_PIPELINED"), .INIT_Q1(0), .INIT_Q2(0))
-iddr_ctl (.C(rxc), .CE(1'b1), .D(rx_ctl), .Q1(ctl_rise), .Q2(ctl_fall), .R(0), .S(0)); //rx_ctl is also DDR
+iddr_ctl (.C(rxclk), .CE(1'b1), .D(rx_ctl), .Q1(ctl_rise), .Q2(ctl_fall), .R(0), .S(0)); //rx_ctl is also DDR
 //rx_dv rising edge - high when data valid
 //rx_er falling edge - XOR with rx_dv -> if high, error
 
@@ -53,7 +53,7 @@ logic rx_er;
 assign rx_er = ctl_rise ^ ctl_fall;
 
 //state machine:
-//preamble: 0xAA
+//preamble: 0x55?? check*
 //idle: waiting for frame
 //active: real data
 typedef enum logic [1:0] {
