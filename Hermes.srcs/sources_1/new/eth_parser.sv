@@ -88,7 +88,7 @@ module eth_parser(output logic [47:0] dest_mac, output logic [47:0] src_mac, out
                     destmac: begin
                         dest_mac <= {dest_mac[39:0], data};
                         cnt <= cnt+1;
-                        if(cnt >= 6) begin
+                        if(cnt >= 5) begin
                             cnt <= 0;
                             state <= srcmac;
                         end
@@ -97,19 +97,37 @@ module eth_parser(output logic [47:0] dest_mac, output logic [47:0] src_mac, out
                     srcmac: begin
                         src_mac <= {src_mac[39:0], data};
                         cnt <= cnt+1;
-                        if(cnt >= 6) begin
+                        if(cnt >= 5) begin
                             cnt <= 0;
                             state <= ether;
                         end
                     end
                     
-                    ether: begin
-                    
-                    
+                    ether: begin //2 bytes
+                        ether_type <= {ether_type[7:0], data};
+                        cnt <= cnt + 1;
+                        
+                        if(cnt >= 1) begin
+                            cnt <= 0;
+                            state <= payload;
+                            header_valid <= 1;
+                            fcs_count <= 0;
+                        end
                     end
                     
                     payload: begin
-                    
+                        if(fcs_count < 4) begin
+                            fcs_buf[fcs_count] <= data;
+                            fcs_count <= fcs_count + 1;
+                        end else begin
+                            payload_data <= fcs_buf[0];
+                            payload_valid <= 1;
+                            
+                            fcs_buf[0] <= fcs_buf[1];
+                            fcs_buf[1] <= fcs_buf[2];
+                            fcs_buf[2] <= fcs_buf[3];
+                            fcs_buf[3] <= data;
+                        end
                     end
                 endcase
             end
