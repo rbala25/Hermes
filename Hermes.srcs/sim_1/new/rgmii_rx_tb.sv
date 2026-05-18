@@ -35,15 +35,41 @@ module rgmii_rx_tb;
     task sendbyte (input logic [7:0] testdata);
         @(negedge rxclk);
         data = testdata[3:0]; //set lower half on falling edge so its stable for rising edge
-        rx_ctl = 1'b1;
         
         @(posedge rxclk);
         data = testdata[7:4];
-        rx_ctl = 1'b1;
     endtask
     
     initial begin
+    $dumpfile("rgmii_rx_tb.vcd");
+    $dumpvars(0, rgmii_rx_tb);
     
+    rx_ctl = 0;
+    rxd = 0;
+    
+    repeat(32) @(posedge rxclk); //wait
+    
+    @(negedge rxclk); #1;
+    rx_ctl = 1;
+    
+    repeat(7) sendbyte(8'h55); //preamble
+    send_byte(8'hD5); //sfd
+
+    //actual frame bytes
+    send_byte(8'hAA);
+    send_byte(8'hBB);
+    send_byte(8'hCC);
+    send_byte(8'hDD);
+    send_byte(8'hEE);
+    send_byte(8'hFF);
+    
+    //end frame
+    @(negedge rxclk); #1; //after last neg edge
+    rx_ctl = 0;
+    rxd    = 0;
+    
+    repeat(8) @(posedge rxclk);
+    $finish;
     
     end
     
