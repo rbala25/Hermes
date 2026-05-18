@@ -27,17 +27,18 @@ module rgmii_rx_tb;
     logic [7:0] data;
     logic valid;
     logic frame_active;
+    logic rst = 0;
     
-    rgmii_rx dut(.rxclk, .rxd, .rx_ctl, .data, .valid, .frame_active);
+    rgmii_rx dut(.rxclk, .rxd, .rx_ctl, .data, .valid, .frame_active, .rst);
     
     always #4 rxclk = ~rxclk;
     
-    task sendbyte (input logic [7:0] testdata);
-        @(negedge rxclk);
-        data = testdata[3:0]; //set lower half on falling edge so its stable for rising edge
+    task automatic send_byte (input logic [7:0] testdata);
+        @(negedge rxclk); #1;
+        rxd = testdata[3:0]; //set lower half on falling edge so its stable for rising edge
         
-        @(posedge rxclk);
-        data = testdata[7:4];
+        @(posedge rxclk); #1;
+        rxd = testdata[7:4];
     endtask
     
     initial begin
@@ -47,7 +48,9 @@ module rgmii_rx_tb;
     rx_ctl = 0;
     rxd = 0;
     
+    rst = 1;
     repeat(32) @(posedge rxclk); //wait
+    rst = 0;
     
     @(negedge rxclk); #1;
     rx_ctl = 1;

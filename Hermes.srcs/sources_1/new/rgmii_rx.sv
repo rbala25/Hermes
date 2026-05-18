@@ -21,7 +21,7 @@
 
 
 module rgmii_rx(output logic [7:0] data, output logic valid, output logic frame_active, 
-                input logic rxclk, input logic[3:0] rxd, input logic rx_ctl);
+                input logic rxclk, input logic[3:0] rxd, input logic rx_ctl, input logic rst);
                 
 //need to capture on both edges - use IDDR
 logic [3:0] rxd_rise, rxd_fall;
@@ -64,33 +64,39 @@ typedef enum logic [1:0] {
 state_t curr;
 
 always_ff @(posedge rxclk) begin
-    valid <= 0;
-    frame_active <= 0; //defaults
-    
-    unique case(curr)
-        idle: begin
-            if(rawvalid && rawdata == 8'h55) curr <= preamble;
-        end
+    if(rst) begin
+        curr         <= idle;
+        valid        <= 1'b0;
+        frame_active <= 1'b0;
+    end else begin
+        valid <= 0;
+        frame_active <= 0; //defaults
         
-        preamble: begin
-            if(!rawvalid) curr <= idle; //never got to SFD (0xD5)
-            else if(rawdata == 8'hD5) begin
-                curr <= active;
-                frame_active <= 1;
-            end //still 0x55 so still preamble
-        end
-        
-        active: begin
-            if(!rawvalid) curr <= idle; //frame over? i think *check
-            else if(rx_er) begin
-                curr <= idle; //erred out
-                valid <= 0;
-            end else begin
-                data <= rawdata;
-                valid <= 1;
-                frame_active <= 1;
-            end       
-        end
-    endcase    
+        unique case(curr)
+            idle: begin
+                if(rawvalid && rawdata == 8'h55) curr <= preamble;
+            end
+            
+            preamble: begin
+                if(!rawvalid) curr <= idle; //never got to SFD (0xD5)
+                else if(rawdata == 8'hD5) begin
+                    curr <= active;
+                    frame_active <= 1;
+                end //still 0x55 so still preamble
+            end
+            
+            active: begin
+                if(!rawvalid) curr <= idle; //frame over? i think *check
+                else if(rx_er) begin
+                    curr <= idle; //erred out
+                    valid <= 0;
+                end else begin
+                    data <= rawdata;
+                    valid <= 1;
+                    frame_active <= 1;
+                end       
+            end
+        endcase    
+    end
 end
 endmodule
