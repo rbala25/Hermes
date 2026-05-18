@@ -67,7 +67,7 @@ always_ff @(posedge rxclk) begin
     valid <= 0;
     frame_active <= 0; //defaults
     
-    case(curr)
+    unique case(curr)
         idle: begin
             if(rawvalid && rawdata == 8'h55) curr <= preamble;
         end

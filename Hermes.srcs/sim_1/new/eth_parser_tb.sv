@@ -7,7 +7,7 @@
 // Design Name: 
 // Module Name: eth_parser_tb
 // Project Name: 
-// Target Devices: 
+// Target Devices: Arty A7 35t
 // Tool Versions: 
 // Description: 
 // 
