@@ -64,7 +64,29 @@ module eth_parser(output logic [47:0] dest_mac, output logic [47:0] src_mac, out
             frame_done <= 0;
             error <= 0;
             frame_active_prev <= frame_active;
-        
+            
+            if(frame_active_prev && !frame_active) begin //non blocking operators (delayed until next pos edge)
+                state <= idle;
+                cnt <= 0;
+                fcs_count <= 0;
+                
+                if(state == payload) begin
+                    frame_done <= 1; //good end, ignore FCS. FCS is already checked by the PHY
+                end else begin
+                    error <= 1; //bad
+                end
+            end
+            
+            else if (valid) begin
+                unique case (state) 
+                    idle: begin
+                        dest_mac <= {40'h0, data};
+                        cnt <= cnt+1;
+                        state <= destmac;
+                    end
+                
+                endcase
+            end
         end
     end          
 endmodule
