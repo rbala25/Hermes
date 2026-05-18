@@ -45,7 +45,7 @@ logic rawvalid;
 //cant put it directly bc we have to make sure valid and no errors
 
 always_ff @(posedge rxclk) begin
-    rawdata <= {rxd_rise, rxd_fall};
+    rawdata <= {rxd_fall, rxd_rise};
     rawvalid <= ctl_rise;
 end
 

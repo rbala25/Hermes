@@ -34,12 +34,21 @@ module rgmii_rx_tb;
     
     task sendbyte (input logic [7:0] testdata);
         @(negedge rxclk);
-        data = testdata[7:4];
+        data = testdata[3:0]; //set lower half on falling edge so its stable for rising edge
         rx_ctl = 1'b1;
         
-        @(negedge rxclk);
-        data = testdata[3:0];
+        @(posedge rxclk);
+        data = testdata[7:4];
         rx_ctl = 1'b1;
     endtask
+    
+    initial begin
+    
+    
+    end
+    
+    always @(posedge rxclk) begin
+        if(valid) $display("[%0t ns] data = 0x%02X", $time, data);
+    end
 
 endmodule
