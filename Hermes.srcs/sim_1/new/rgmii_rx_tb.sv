@@ -55,7 +55,7 @@ module rgmii_rx_tb;
     @(negedge rxclk); #1;
     rx_ctl = 1;
     
-    repeat(7) sendbyte(8'h55); //preamble
+    repeat(7) send_byte(8'h55); //preamble
     send_byte(8'hD5); //sfd
 
     //actual frame bytes

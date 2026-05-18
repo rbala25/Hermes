@@ -53,17 +53,17 @@ always_ff @(posedge rxclk) begin
 
             preamble: begin
                 if(!rx_dv) begin
-                    curr       <= idle;    //rx_dv dropped before SFD
+                    curr       <= idle;
                     nibble_sel <= 0;
-                end else if(!nibble_sel) begin //lower nibble - just store it
+                end else if(!nibble_sel) begin //lower nibble
                     lower_nibble <= rxd;
                     nibble_sel   <= 1;
-                end else begin                 //upper nibble - check if this byte is SFD
+                end else begin                 //upper nibble
                     nibble_sel <= 0;
-                    if({rxd, lower_nibble} == 8'hD5) begin //{upper, lower} - SFD detected
+                    if({rxd, lower_nibble} == 8'hD5) begin //SFD
                         curr         <= active;
                         frame_active <= 1;
-                    end //else 0x55 preamble, stay
+                    end 
                 end
             end
 
@@ -72,13 +72,13 @@ always_ff @(posedge rxclk) begin
                     curr       <= idle;    //frame over
                     nibble_sel <= 0;
                 end else if(rx_er) begin
-                    curr       <= idle;    //erred out, discard frame
+                    curr       <= idle;    //erred out
                     nibble_sel <= 0;
                 end else if(!nibble_sel) begin //lower nibble
                     lower_nibble <= rxd;
                     nibble_sel   <= 1;
                     frame_active <= 1;
-                end else begin                 //upper nibble - emit full byte
+                end else begin
                     data         <= {rxd, lower_nibble};
                     valid        <= 1;
                     frame_active <= 1;
