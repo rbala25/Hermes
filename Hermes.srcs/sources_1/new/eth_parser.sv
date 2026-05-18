@@ -84,7 +84,33 @@ module eth_parser(output logic [47:0] dest_mac, output logic [47:0] src_mac, out
                         cnt <= cnt+1;
                         state <= destmac;
                     end
-                
+                    
+                    destmac: begin
+                        dest_mac <= {dest_mac[39:0], data};
+                        cnt <= cnt+1;
+                        if(cnt >= 6) begin
+                            cnt <= 0;
+                            state <= srcmac;
+                        end
+                    end
+                    
+                    srcmac: begin
+                        src_mac <= {src_mac[39:0], data};
+                        cnt <= cnt+1;
+                        if(cnt >= 6) begin
+                            cnt <= 0;
+                            state <= ether;
+                        end
+                    end
+                    
+                    ether: begin
+                    
+                    
+                    end
+                    
+                    payload: begin
+                    
+                    end
                 endcase
             end
         end
