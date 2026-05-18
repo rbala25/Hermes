@@ -20,7 +20,16 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module eth_parser(
-
-    );
+module eth_parser(output logic [47:0] dest_mac, output logic [47:0] src_mac, output logic [15:0] ether_type, output logic header_valid,
+                    output logic [7:0] payload_data, output logic payload_valid, output logic frame_done, output logic error,
+                    input logic clk, input logic rst, input logic [7:0] data, input logic valid, input logic frame_active);
+                    
+    typedef enum logic [2:0] {
+        idle,
+        destmac,
+        srcmac,
+        ether,
+        payload
+    } state_t
+                    
 endmodule
