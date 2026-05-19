@@ -9,7 +9,7 @@
 // Project Name: 
 // Target Devices: Arty A7 35t
 // Tool Versions: 
-// Description: 
+// Description: OLDER VERSION - THIS IS NOT USED
 // 
 // Dependencies: 
 // 
