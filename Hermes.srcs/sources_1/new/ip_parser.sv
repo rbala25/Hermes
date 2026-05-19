@@ -60,19 +60,80 @@ module ip_parser(
         TOT_LEN, //2-3
         IP_IDENT, //4-5
         FLAGS_FRAG, //6-7
-        TTL_B, //8
-        PROTO_B, //9
-        CHKSUM_B, //10-11
-        SRC_B, //12-15
-        DST_B, //16-19
-        OPTIONS_B, //20+ (if IHL > 5)
-        PAYLOAD_B, //rest
-        DROP_B
+        TTL, //8
+        PROTO, //9
+        CHKSUM, //10-11
+        SRC, //12-15
+        DST, //16-19
+        OPTIONS, //20+ (if IHL > 5)
+        PAYLOAD, //rest
+        DROP
     } state_t;
 
 state_t state;
 logic [3:0] cnt;
 logic [7:0] options_left;
 
+//checksum
+logic [7:0] checksum_in;
+logic [15:0] checksum;
+logic phase;
 
+logic [16:0] next;
+always_comb begin
+    next = {1'b0, checksum} + {1'b0, checksum_in, payload};
+    if(next[16]) next = {1'b0, next[15:0]} + 17'h1; //1s complement
+end
+
+always_ff @(posedge clk) begin
+    if (rst) begin
+        state <= IDLE;
+        cnt  <= 0;
+        options_left <= 0;
+        ip_version <= 0;
+        ip_ihl <= 0;
+        ip_dscp <= 0;
+        ip_total_len <= 0;
+        ip_id <= 0;
+        ip_flags <= 0;
+        ip_frag_offset <= 0;
+        ip_ttl <= 0;
+        ip_protocol <= 0;
+        ip_checksum <= 0;
+        ip_src <= 0;
+        ip_dest <= 0;
+        ip_header_valid <= 0;
+        ip_checksum_val <= 0;
+        ip_is_fragment <= 0;
+        ip_payload_data <= 0;
+        ip_payload_valid <= 0;
+        ip_payload_done <= 0;
+        ip_error <= 0;
+        checksum_in <= 0;
+        checksum <= 0;
+        phase <= 0;
+    end else begin
+
+        ip_header_valid  <= 0;
+        ip_payload_valid <= 0;
+        ip_payload_done  <= 0;
+        ip_error         <= 0;
+        
+        if(error) begin
+            ip_error <= 1;
+            state <= IDLE;
+            cnt <= 0;
+        end else if(frame_done) begin
+            if(state == PAYLOAD) ip_payload_done <= 1;
+            else if (state != IDLE) ip_error <= 1;
+            state <= IDLE;
+            cnt <= 0;
+        end else if(ether == 16'h0800) begin //ignore other than IPv4
+            state     <= VER_IHL;
+            cnt       <= '0;
+            checksum   <= '0;
+            phase <= '0;
+        end
+    end
+end
 endmodule
