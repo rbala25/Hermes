@@ -52,4 +52,27 @@ module ip_parser(
     output logic ip_payload_done,
     output logic ip_error
 );
+
+    typedef enum logic [3:0] {
+        IDLE,
+        VER_IHL, //0
+        DSCP_ECN, //1
+        TOT_LEN, //2-3
+        IP_IDENT, //4-5
+        FLAGS_FRAG, //6-7
+        TTL_B, //8
+        PROTO_B, //9
+        CHKSUM_B, //10-11
+        SRC_B, //12-15
+        DST_B, //16-19
+        OPTIONS_B, //20+ (if IHL > 5)
+        PAYLOAD_B, //rest
+        DROP_B
+    } state_t;
+
+state_t state;
+logic [3:0] cnt;
+logic [7:0] options_left;
+
+
 endmodule
