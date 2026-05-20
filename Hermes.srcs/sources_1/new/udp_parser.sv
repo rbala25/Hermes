@@ -62,19 +62,19 @@ logic phase;
 
 logic [16:0] next;
 always_comb begin
-    next = {1'b0, checksum} + {1'b0, checksum_in, payload};
+    next = {1'b0, checksum} + {1'b0, checksum_in, payload_data};
     if (next[16]) next = {1'b0, next[15:0]} + 17'h1;
 end
 
 logic [16:0] next_odd; //if no final byte, spec says pad with 0x00
 always_comb begin
-    next_odd = {1'b0, checksum} + {1'b0, payload, 8'h00};
+    next_odd = {1'b0, checksum} + {1'b0, payload_data, 8'h00};
     if (next_odd[16]) next_odd = {1'b0, next_odd[15:0]} + 17'h1;
 end
 
 logic [16:0] next_double; //length needs to be added twice (field + pseudo)
 always_comb begin
-    next_double = {1'b0, next[15:0]} + {1'b0, checksum_in, payload};
+    next_double = {1'b0, next[15:0]} + {1'b0, checksum_in, payload_data};
     if (next_double[16]) next_double = {1'b0, next_double[15:0]} + 17'h1;
 end
 
@@ -103,7 +103,7 @@ always_ff @(posedge clk) begin //synchronous, active high resets
     end else begin
         udp_header_valid <= 0;
         udp_payload_valid <= 0;
-        udp_payload_done <= 1;
+        udp_payload_done <= 0;
         udp_error <= 0;
         
         if(error) begin
@@ -120,7 +120,7 @@ always_ff @(posedge clk) begin //synchronous, active high resets
         end else if (payload_valid) begin
         
             if(state != idle && state != length) begin
-                if(!phase) checksum_in <= payload;
+                if(!phase) checksum_in <= payload_data;
                 else checksum <= next[15:0];
                 phase <= ~phase;
             end
@@ -147,17 +147,17 @@ always_ff @(posedge clk) begin //synchronous, active high resets
                 end
                 
                 length: begin
-                    udp_length <= {udp_length[7:0], payload};
+                    udp_length <= {udp_length[7:0], payload_data};
                     cnt <= cnt + 1;
                     if(cnt >= 1) begin
                         checksum <= next_double[15:0];
                         cnt <= 0;
-                        state <= length;
-                    end else checksum_in <= payload;
+                        state <= chksum;
+                    end else checksum_in <= payload_data;
                 end
                 
                 chksum: begin
-                    udp_checksum <= {udp_checksum[7:0], payload};
+                    udp_checksum <= {udp_checksum[7:0], payload_data};
                     cnt <= cnt + 1;
                     if (cnt) begin
                         cnt <= 0;
@@ -167,7 +167,7 @@ always_ff @(posedge clk) begin //synchronous, active high resets
                 end
                 
                 payload: begin
-                    udp_payload <= payload;
+                    udp_payload <= payload_data;
                     udp_payload_valid <= 1;
                     
                     if(ip_payload_done) begin
