@@ -185,6 +185,68 @@ always_ff @(posedge clk) begin
                         state <= TTL;
                     end
                 end
+                
+                TTL: begin
+                    ip_ttl <= payload;
+                    state <= PROTO;
+                end
+                
+                PROTO: begin
+                    ip_protocol <= payload;
+                    state <= CHKSUM;
+                end
+                
+                CHKSUM: begin
+                    ip_checksum <= {ip_checksum[7:0], payload};
+                    cnt <= cnt + 1;
+                    if (cnt >= 1) begin 
+                        cnt <= 0; 
+                        state <= SRC; 
+                    end
+                end
+                
+                SRC: begin
+                    ip_src <= {ip_src[23:0], payload};
+                    cnt <= cnt + 1;
+                    if (cnt >= 3) begin 
+                        cnt <= 0; 
+                        state <= DST; 
+                    end
+                end
+                
+                DST: begin
+                    ip_dest <= {ip_dest[23:0], payload};
+                    cnt <= cnt + 1;
+                    if (cnt >= 3) begin 
+                        cnt <= 0; 
+                        ip_is_fragment <= ip_flags[0] | (|ip_frag_offset); //MF | offset bit
+                        //only 0 if offset is 0 and no fragments left
+                        
+                        if(ip_ihl > 4'h5) begin
+                            options_left <= ((ip_ihl - 4'h5) << 2) - 1; //extra words, mul by 4, sub 1
+                            state <= OPTIONS;
+                        end else begin 
+                            ip_checksum_val <= (next[15:0] == 16'hFFFF);
+                            ip_header_valid <= 1;
+                            state <= PAYLOAD;
+                        end
+                    end
+                end
+                
+                OPTIONS: begin //dont parse
+                    if(options_left == 0) begin //last byte
+                        ip_checksum_val <= (next[15:0] == 16'hFFFF);
+                        ip_header_valid <= 1;
+                        state <= PAYLOAD;
+                    end else options_left <= options_left - 1;
+                end
+                
+                PAYLOAD: begin
+                    ip_payload_data <= payload;
+                    ip_payload_valid <= 1;
+                end
+                
+                DROP: ; //absorb remaining bytes
             endcase
         end
     end
