@@ -39,7 +39,7 @@ module ip_parser(
     output logic [2:0] ip_flags,
     output logic [12:0] ip_frag_offset,
     output logic [7:0] ip_ttl,
-    output logic [7:0] ip_protocol, //6 is tcp, 7=udp, 1=icmp
+    output logic [7:0] ip_protocol, //6 is tcp, 17=udp, 1=icmp
     output logic [15:0] ip_checksum,
     output logic [31:0] ip_src,
     output logic [31:0] ip_dest,
