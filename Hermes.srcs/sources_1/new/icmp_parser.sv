@@ -152,6 +152,68 @@ module icmp_parser(
                         end
                     end
                 end
+                
+                rest0: begin //byte 4: echo req (0x08) or echo reply (0x00) identifier high bit
+                    if (payload_valid) begin
+                        if (r_type == 8'h00 || r_type == 8'h08) //shoudlnt read outputs directly, so use r_type
+                            icmp_identifier[15:8] <= payload;
+                        checksum_in <= payload;
+                        state <= rest1;
+                    end
+                end
+                
+                rest1: begin
+                    if (payload_valid) begin
+                        if (r_type == 8'h00 || r_type == 8'h08) 
+                            icmp_identifier[7:0] <= payload;
+                        checksum <= next[15:0];
+                        checksum_in <= 0;
+                        state <= rest2;
+                    end
+                end
+                
+                rest2: begin //seq number
+                    if (payload_valid) begin
+                        if (r_type == 8'h00 || r_type == 8'h08)
+                            icmp_seq_num[15:8] <= payload;
+                        checksum_in <= payload;
+                        state <= rest3;
+                    end
+                end
+                
+                rest3: begin
+                    if (payload_valid) begin
+                        if (r_type == 8'h00 || r_type == 8'h08) 
+                            icmp_seq_num[7:0] <= payload;
+                        checksum <= next[15:0];
+                        checksum_in <= 0;
+                        icmp_header_valid <= 1;
+                        phase <= 0;
+                        state <= s_payload;
+                    end
+                end
+                
+                s_payload: begin
+                    if (payload_valid) begin
+                        icmp_payload_data <= payload;
+                        icmp_payload_valid <= 1;
+                        if (!phase) begin
+                            checksum_in <= payload;
+                            phase <= ~phase;
+                        end else begin
+                            checksum <= next[15:0];
+                            checksum_in <= 0;
+                            phase <= ~phase;
+                        end
+                    end
+                    
+                    if (ip_payload_done) begin 
+                        icmp_payload_done <= 1;
+                        if (phase) checksum <= next_odd[15:0];
+                        icmp_checksum_val <= (checksum == 16'hFFFF);
+                        state <= idle;
+                    end
+                end
             endcase
         end
     end
