@@ -83,17 +83,80 @@ always_ff @(posedge clk) begin //synchronous, active high resets
         udp_payload_done <= 1;
         udp_error <= 0;
         
-        unique case (state) 
-            idle: begin
-                if(error) begin
-                    udp_error <= 1;
-                    state <= idle;
-                    cnt <= 0;
-                end
-            
+        if(error) begin
+            udp_error <= 1;
+            state <= idle;
+            cnt <= 0;
+        end else if (ip_header_valid) begin
+            if(ip_protocol == 8'h11) begin
+                chksum_acc <= ip_src[31:16] + ip_src[15:0] + ip_dest[31:16] + ip_dest[15:0] + ip_protocol;
+                byte_pending <= 0;
+                cnt <= 0;
+                state <= src;
             end
-        
-        endcase
+        end else if (payload_valid) begin
+            unique case (state)
+                idle: ;
+                
+                src: begin
+                    udp_src <= {udp_src[7:0], payload_data};
+                    cnt <= cnt + 1;
+                    if(cnt >= 1) begin
+                        chksum_acc <= chksum_acc + {udp_src[7:0], payload};
+                        cnt <= 0;
+                        state <= dest;
+                    end
+                end
+                
+                dest: begin
+                    udp_dest <= {udp_dest[7:0], payload_data};
+                    cnt <= cnt + 1;
+                    if(cnt >= 1) begin
+                        chksum_acc <= chksum_acc + {udp_dest[7:0], payload};
+                        cnt <= 0;
+                        state <= length;
+                    end
+                end
+                
+                length: begin
+                    udp_length <= {udp_length[7:0], payload};
+                    cnt <= cnt + 1;
+                    if(cnt >= 1) begin
+                        chksum_acc <= chksum_acc + (2*{udp_length[7:0], payload});
+                        cnt <= 0;
+                        state <= length;
+                    end
+                end
+                
+                checksum: begin
+                    udp_checksum <= {udp_checksum[7:0], payload};
+                    cnt <= cnt + 1;
+                    if (cnt) begin
+                        chksum_acc <= chksum_acc + {udp_checksum[7:0], payload};
+                        cnt <= 0;
+                        state <= payload;
+                        udp_header_valid <= 1;
+                    end
+                end
+                
+                payload: begin
+                    udp_payload <= payload;
+                    udp_payload_valid <= 1;
+                    
+                    if(ip_payload_done) begin
+                        udp_payload_done <= 1;
+                        state <= idle;
+                        if(byte_pending) begin
+                            chksum_acc <= chksum_acc + {checksum_in, payload};
+                            byte_pending <= 0;
+                        end else begin
+                            chksum_acc <= chksum_acc + {payload, 8'h0}; //padding according to spec
+                        end
+                    end
+                    
+                end
+            endcase
+        end
     end
 end
 endmodule
