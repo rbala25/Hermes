@@ -119,7 +119,7 @@ always_ff @(posedge clk) begin //synchronous, active high resets
             end
         end else if (payload_valid) begin
         
-            if(state != idle && state != payload) begin
+            if(state != idle && state != length) begin
                 if(!phase) checksum_in <= payload;
                 else checksum <= next[15:0];
                 phase <= ~phase;
@@ -153,7 +153,7 @@ always_ff @(posedge clk) begin //synchronous, active high resets
                         checksum <= next_double[15:0];
                         cnt <= 0;
                         state <= length;
-                    end
+                    end else checksum_in <= payload;
                 end
                 
                 chksum: begin
@@ -174,15 +174,8 @@ always_ff @(posedge clk) begin //synchronous, active high resets
                         udp_payload_done <= 1;
                         state <= idle;
                         phase <= 0;
-                        if(!phase) begin
-                           udp_checksum_val <= (next_odd[15:0] == 16'hFFFF) || (udp_checksum == 16'h0000);
-                        end else begin
-                            udp_checksum_val <= (next[15:0] == 16'hFFFF) || (udp_checksum == 16'h0000);
-                        end
-                    end else begin
-                        if(!phase) checksum_in <= payload;
-                        else checksum <= next[15:0];
-                        phase <= ~phase;
+                        if(!phase) udp_checksum_val <= (next_odd[15:0] == 16'hFFFF) || (udp_checksum == 16'h0000);
+                        else udp_checksum_val <= (next[15:0] == 16'hFFFF) || (udp_checksum == 16'h0000);
                     end
                 end
                 
