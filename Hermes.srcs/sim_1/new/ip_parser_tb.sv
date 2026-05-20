@@ -127,4 +127,135 @@ task automatic check(input string name, input logic cond);
     end
 endtask
 
+initial begin
+    rst = 1;
+    payload = 0;
+    payload_valid = 0;
+    header_valid = 0;
+    ether = 0;
+    frame_done = 0;
+    error = 0;
+ 
+    repeat(4) @(posedge clk);
+    rst = 0;
+    repeat(2) @(posedge clk);
+ 
+    //test 1 - valid ipv4 frame, check all fields
+    $display("\nTEST 1: valid ipv4 frame");
+    start_frame(16'h0800);
+    send_header(VALID_HDR);
+ 
+    check("ip_header_valid", ip_header_valid == 1);
+    check("ip_version == 4", ip_version == 4'h4);
+    check("ip_ihl == 5", ip_ihl == 4'h5);
+    check("ip_total_len == 0x0028", ip_total_len == 16'h0028);
+    check("ip_id == 0x1234", ip_id == 16'h1234);
+    check("ip_flags == 010 (DF)", ip_flags == 3'b010);
+    check("ip_frag_offset == 0", ip_frag_offset == 13'h0);
+    check("ip_ttl == 64", ip_ttl == 8'h40);
+    check("ip_protocol == 6 (TCP)", ip_protocol == 8'h06);
+    check("ip_checksum == 0x5CF2", ip_checksum == 16'h5CF2);
+    check("ip_src == 192.168.1.1", ip_src == 32'hC0A80101);
+    check("ip_dest == 10.0.0.1", ip_dest == 32'h0A000001);
+    check("ip_checksum_val", ip_checksum_val == 1);
+    check("ip_is_fragment == 0", ip_is_fragment == 0);
+    check("ip_error == 0", ip_error == 0);
+ 
+    send_byte(8'hDE); 
+    check("payload 0xDE", ip_payload_valid && ip_payload_data == 8'hDE);
+    send_byte(8'hAD); 
+    check("payload 0xAD", ip_payload_valid && ip_payload_data == 8'hAD);
+    send_byte(8'hBE); 
+    check("payload 0xBE", ip_payload_valid && ip_payload_data == 8'hBE);
+    send_byte(8'hEF); 
+    check("payload 0xEF", ip_payload_valid && ip_payload_data == 8'hEF);
+ 
+    end_frame();
+    check("ip_payload_done", ip_payload_done == 1);
+ 
+    repeat(3) @(posedge clk);
+ 
+    //test 2 - non-ipv4 ethertype (ARP), should be ignored entirely
+    $display("\nTEST 2: ARP ethertype (0x0806)");
+    start_frame(16'h0806);
+    send_header(VALID_HDR);
+ 
+    check("ip_header_valid == 0", ip_header_valid  == 0);
+    check("ip_payload_valid == 0", ip_payload_valid == 0);
+ 
+    end_frame();
+    check("ip_error == 0", ip_error == 0);
+ 
+    repeat(3) @(posedge clk);
+ 
+    //test 3 - bad version
+    $display("\nTEST 3: bad IP version (0x65)");
+    start_frame(16'h0800);
+    send_byte(8'h65); //version=6, ihl=5
+    for(int i = 1; i < 20; i++) send_byte(VALID_HDR[i]);
+ 
+    check("ip_header_valid == 0", ip_header_valid == 0);
+ 
+    end_frame();
+    check("ip_error on frame_done in DROP", ip_error == 1);
+ 
+    repeat(3) @(posedge clk);
+ 
+    //test 4 - mf=1
+    $display("\nTEST 4: fragmented packet");
+    start_frame(16'h0800);
+    send_header(FRAG_HDR);
+ 
+    check("ip_header_valid",       ip_header_valid == 1);
+    check("ip_is_fragment == 1",   ip_is_fragment  == 1);
+    check("ip_flags[0] == 1 (MF)", ip_flags[0]     == 1);
+    check("ip_protocol == 17 (UDP)", ip_protocol   == 8'h11);
+ 
+    end_frame();
+    repeat(3) @(posedge clk);
+ 
+    //tst 5 - error signal
+    $display("\nTEST 5: error mid-header");
+    start_frame(16'h0800);
+    for(int i = 0; i < 8; i++) send_byte(VALID_HDR[i]);
+ 
+    inject_error();
+    check("ip_error == 1",        ip_error        == 1);
+    check("ip_header_valid == 0", ip_header_valid == 0);
+ 
+    repeat(3) @(posedge clk);
+ 
+    //test 6 - truncated
+    $display("\nTEST 6: truncated frame");
+    start_frame(16'h0800);
+    for(int i = 0; i < 12; i++) send_byte(VALID_HDR[i]); //cut off at byte 12
+ 
+    end_frame();
+    check("ip_error == 1 (truncated)", ip_error        == 1);
+    check("ip_header_valid == 0",      ip_header_valid == 0);
+ 
+    repeat(3) @(posedge clk);
+ 
+    //back to back frames
+    $display("\nTEST 7: back-to-back frames");
+    start_frame(16'h0800);
+    send_header(VALID_HDR);
+    send_byte(8'hAA);
+    end_frame();
+    check("frame 1 payload_done", ip_payload_done == 1);
+ 
+    start_frame(16'h0800);
+    send_header(VALID_HDR);
+    check("frame 2 header_valid",  ip_header_valid == 1);
+    check("frame 2 checksum_val",  ip_checksum_val == 1);
+    check("frame 2 src correct",   ip_src          == 32'hC0A80101);
+    send_byte(8'hBB);
+    end_frame();
+    check("frame 2 payload_done", ip_payload_done == 1);
+ 
+    repeat(5) @(posedge clk);
+ 
+    $display("\n%0d passed, %0d failed", pass_count, fail_count);
+    $finish;
+end
 endmodule
