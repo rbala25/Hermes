@@ -42,4 +42,117 @@ module icmp_parser(
     output logic icmp_payload_done,
     output logic icmp_error
     );
+    
+    typedef enum logic [3:0] { 
+        idle,
+        s_type,
+        code,
+        cksum,
+        rest0,
+        rest1,
+        rest2,
+        rest3,
+        s_payload
+    } state_t;
+ 
+    state_t state;
+    logic cnt;
+    logic [7:0] r_type;
+    
+    logic [7:0] checksum_in;
+    logic [15:0] checksum;
+    logic phase;
+    
+    logic [16:0] next;
+    always_comb begin
+        next = {1'b0, checksum} + {1'b0, checksum_in, payload};
+        if (next[16]) next = {1'b0, next[15:0]} + 17'h1;
+    end
+    
+    logic [16:0] next_odd; //final byte for payload of odd length
+    always_comb begin
+        next_odd = {1'b0, checksum} + {1'b0, checksum_in, 8'h00};
+        if (next_odd[16]) next_odd = {1'b0, next_odd[15:0]} + 17'h1;
+    end
+    
+    always_ff @(posedge clk) begin
+         if (rst) begin
+            state              <= idle;
+            cnt                <= 0;
+            r_type             <= 0;
+            icmp_type          <= 0;
+            icmp_code          <= 0;
+            icmp_checksum      <= 0;
+            icmp_identifier    <= 0;
+            icmp_seq_num       <= 0;
+            icmp_header_valid  <= 0;
+            icmp_checksum_val  <= 0;
+            icmp_payload_data  <= 0;
+            icmp_payload_valid <= 0;
+            icmp_payload_done  <= 0;
+            icmp_error         <= 0;
+            checksum           <= 0;
+            checksum_in        <= 0;
+            phase              <= 0;
+        end else begin
+            icmp_header_valid  <= 0;
+            icmp_payload_valid <= 0;
+            icmp_payload_done  <= 0;
+            icmp_checksum_val  <= 0;
+            
+            if(error) begin
+                icmp_error <= 1;
+                state <= idle;
+            end
+            
+            unique case (state) 
+                idle: begin
+                    icmp_error <= 0;
+                    
+                    if(ip_header_valid && (ip_protocol == 8'h01)) begin
+                        checksum <= 0;
+                        phase <= 0;
+                        state <= s_type;
+                    end
+                end
+                
+                s_type: begin //byte 0
+                    if (payload_valid) begin
+                        icmp_type <= payload;
+                        r_type <= payload;
+                        
+                        checksum_in <= payload;
+                        state <= code;
+                    end
+                end
+                
+                code: begin
+                    if (payload_valid) begin
+                        icmp_code <= payload;
+
+                        checksum <= next[15:0];
+                        checksum_in <= 0;
+                        state <= cksum;
+                        cnt <= 0;
+                    end
+                end
+                
+                cksum: begin
+                    if (payload_valid) begin
+                        if (!cnt) begin
+                            icmp_checksum[15:8] <= payload;
+                            checksum_in <= payload;
+                            cnt <= 1;
+                        end else begin
+                            icmp_checksum[7:0] <= payload;
+                            checksum <= next[15:0];
+                            checksum_in <= 0;
+                            cnt <= 0;
+                            state <= rest0;
+                        end
+                    end
+                end
+            endcase
+        end
+    end
 endmodule
