@@ -128,11 +128,64 @@ always_ff @(posedge clk) begin
             else if (state != IDLE) ip_error <= 1;
             state <= IDLE;
             cnt <= 0;
-        end else if(ether == 16'h0800) begin //ignore other than IPv4
-            state     <= VER_IHL;
-            cnt       <= '0;
-            checksum   <= '0;
-            phase <= '0;
+        end else if(header_valid) begin
+            if(ether == 16'h0800) begin //ignore other than IPv4
+                state     <= VER_IHL;
+                cnt       <= '0;
+                checksum   <= '0;
+                phase <= '0;
+            end
+        end else if(payload_valid && state != IDLE) begin
+            if(state != PAYLOAD && state != DROP) begin
+                if(!phase) begin checksum_in <= payload; //latch high byte
+                end else checksum <= next[15:0];
+                phase <= ~phase;
+            end
+            
+            unique case (state)
+                VER_IHL: begin //header = IHL * 4 bytes
+                   ip_version <= payload[7:4];;
+                   ip_ihl <= payload[3:0];
+                   
+                   if(payload[7:4] != 4'h4 || payload[3:0] < 4'h5) state <= DROP;
+                   else state <= DSCP_ECN;
+                end
+                
+                DSCP_ECN: begin
+                    ip_dscp <= payload;
+                    state <= TOT_LEN;
+                end
+                
+                TOT_LEN: begin
+                    ip_total_len <= {ip_total_len[7:0], payload};
+                    cnt <= cnt + 1;
+                    if(cnt >= 1) begin
+                        cnt <= 0;
+                        state <= IP_IDENT;
+                    end
+                end
+                
+                IP_IDENT: begin
+                    ip_id <= {ip_id[7:0], payload};
+                    cnt <= cnt + 1;
+                    if(cnt >= 1) begin
+                        cnt <= 0;
+                        state <= FLAGS_FRAG;
+                    end
+                end
+                
+                FLAGS_FRAG: begin
+                    cnt <= cnt + 1;
+                    if (cnt == 0) begin
+                        ip_flags <= payload[7:5];
+                        ip_frag_offset[12:8] <= payload[4:0];
+                    end else begin
+                        ip_frag_offset[7:0] <= payload;
+                        cnt <= 0;
+                        state <= TTL;
+                    end
+                end
+            endcase
         end
     end
 end
