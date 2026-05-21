@@ -74,7 +74,64 @@ always_ff @(posedge tx_clk) begin
         tx_valid <= 0;
         payload_ready <= 0;
         done <= 0;
-
+        
+        unique case (state)
+            idle: begin
+                cnt <= 0;
+                if (start) begin
+                    tx_data <= 8'h45;
+                    tx_valid <= 1;
+                    cnt <= 1;
+                    state <= header;
+                end
+            end
+            
+            header: begin
+                if(tx_ready) begin
+                    tx_valid <= 1;
+                    cnt <= cnt + 1;
+                    
+                    unique case (cnt)
+                        5'd1: tx_data <= 8'h00; //dscp.ecn
+                        5'd2: tx_data <= total_length[15:8];
+                        5'd3: tx_data <= total_length[7:0];
+                        5'd4: tx_data <= identification[15:8];
+                        5'd5: tx_data <= identification[7:0];
+                        5'd6: tx_data <= 8'h40; //flag df
+                        5'd7: tx_data <= 8'h00;  
+                        5'd8: tx_data <= 8'h40; //ttl = 64
+                        5'd9: tx_data <= protocol;
+                        5'd10: tx_data <= checksum[15:8];
+                        5'd11: tx_data <= checksum[7:0];
+                        5'd12: tx_data <= src_ip[31:24];
+                        5'd13: tx_data <= src_ip[23:16];
+                        5'd14: tx_data <= src_ip[15:8];
+                        5'd15: tx_data <= src_ip[7:0];
+                        5'd16: tx_data <= dst_ip[31:24];
+                        5'd17: tx_data <= dst_ip[23:16];
+                        5'd18: tx_data <= dst_ip[15:8];
+                        5'd19: begin
+                            tx_data <= dst_ip[7:0];
+                            state   <= data;
+                        end
+                        default: tx_data <= 8'h00;
+                    endcase
+                end
+            end
+            
+            data: begin
+                if(tx_ready && payload_valid) begin
+                    tx_data <= payload_data;
+                    tx_valid <= 1;
+                    payload_ready <= 1;
+                end
+                
+                if(tx_ready && !payload_valid) begin
+                    done <= 1;
+                    state <= idle;
+                end
+            end
+        endcase
     end
 end
 endmodule
