@@ -63,18 +63,30 @@ always_ff @(posedge tx_clk) begin
                 end
             end
             
-            preamble: begin
+            preamble: begin //7 bytes 0x55, then 0xD5 (lower nibble (5) first)
                 tx_en <= 1;
                 cnt <= cnt + 1;
                 if(cnt > 15)begin
                     txd <= 4'hd;
+                    byte_buf <= data;
+                    ready <= 1;
                     state <= transmit;
                     cnt <= 0;
                 end else txd <= 4'h5;
             end
             
             transmit: begin
-            
+                tx_en <= 1;
+                if(!nibble_sel) begin
+                    txd <= byte_buf[3:0];
+                    nibble_sel <= ~nibble_sel;
+                end else begin
+                    txd <= byte_buf[7:4];
+                    nibble_sel <= ~nibble_sel;
+                    ready <= 1;
+                    if(valid) byte_buf <= data;
+                    else state <= idle;
+                end
             end
         endcase
     end
