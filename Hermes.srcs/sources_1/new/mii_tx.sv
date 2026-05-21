@@ -66,7 +66,7 @@ always_ff @(posedge tx_clk) begin
             preamble: begin //7 bytes 0x55, then 0xD5 (lower nibble (5) first)
                 tx_en <= 1;
                 cnt <= cnt + 1;
-                if(cnt > 15)begin
+                if(cnt == 15)begin
                     txd <= 4'hd;
                     byte_buf <= data;
                     ready <= 1;

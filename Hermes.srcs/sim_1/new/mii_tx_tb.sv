@@ -43,7 +43,7 @@ always #20 tx_clk = ~tx_clk;
  
 logic [3:0] nibbles[$];
 int fail_count = 0;
-int idx;
+int ready_count;
  
 task check(input string name, input logic got, input logic exp);
     if(got !== exp) begin
@@ -59,19 +59,28 @@ task check_vec(input string name, input logic [3:0] got, input logic [3:0] exp);
     end else $display("PASS %s", name);
 endtask
  
-logic [7:0] frame[] = '{8'hAB, 8'hCD};
+always @(posedge tx_clk) begin
+    if(tx_en) nibbles.push_back(txd);
+    if(ready) begin
+        ready_count <= ready_count + 1;
+        case(ready_count)
+            0: data <= 8'hCD; //second byte
+            1: valid <= 0;    //no more bytes
+        endcase
+    end
+end
  
 initial begin
     tx_clk = 0;
     rst = 1;
     valid = 0;
     data = 0;
-    idx = 0;
+    ready_count = 0;
     repeat(4) @(posedge tx_clk);
     rst = 0;
     @(posedge tx_clk);
  
-    data = frame[0];
+    data = 8'hAB;
     valid = 1;
  
     repeat(40) @(posedge tx_clk);
@@ -98,14 +107,4 @@ initial begin
  
     $finish;
 end
- 
-always @(posedge tx_clk) begin
-    if(tx_en) nibbles.push_back(txd);
-    if(ready) begin
-        idx <= idx + 1;
-        if(idx + 1 < frame.size()) data <= frame[idx + 1];
-        else valid <= 0;
-    end
-end
- 
 endmodule
