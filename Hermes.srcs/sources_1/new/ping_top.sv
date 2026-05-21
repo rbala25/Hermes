@@ -29,9 +29,13 @@ module ping_top #(
     output logic [3:0] txd,
     output logic tx_en,
     input logic [3:0] rxd,
-    input logic rx_dv
+    input logic rx_dv,
+    input logic rstb
     );
     
+    
+assign rst = ~rstb;
+
 logic [7:0] mii_rx_data; //mii_rx
 logic mii_rx_valid;
 logic mii_rx_frame_active; 
@@ -176,7 +180,6 @@ always_ff @(posedge tx_clk) begin
         icmp_tx_start <= 0;
         ip_tx_start <= 0;
         eth_tx_start <= 0;
-        fifo_rd_ptr <= 0;
     end else begin
         icmp_tx_start <= 0;
         ip_tx_start <= 0;
@@ -190,10 +193,7 @@ always_ff @(posedge tx_clk) begin
                 state <= tx_wait;
             end
  
-            tx_wait: if (eth_tx_done) begin
-                fifo_rd_ptr <=0;
-                state <= idle;
-            end
+            tx_wait: if (eth_tx_done) state <= idle;
         endcase
     end
 end
