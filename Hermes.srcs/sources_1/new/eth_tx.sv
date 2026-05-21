@@ -21,20 +21,20 @@
 
 
 module eth_tx(
-    input  logic        tx_clk,
-    input  logic        rst,
+    input logic tx_clk,
+    input logic rst,
 
-    input  logic [47:0] dst_mac, //for ip/icmp
-    input  logic [15:0] ether_type,
-    input  logic [7:0]  payload_data,
-    input  logic        payload_valid,
-    input  logic        start,
-    output logic        payload_ready,
-    output logic        done,
+    input logic [47:0] dst_mac, //for ip/icmp
+    input logic [15:0] ether_type,
+    input logic [7:0] payload_data,
+    input logic payload_valid,
+    input logic start,
+    output logic payload_ready,
+    output logic done,
 
-    output logic [7:0]  txd, //for mii
-    output logic        tx_valid,
-    input  logic        tx_ready
+    output logic [7:0] txd, //for mii
+    output logic tx_valid,
+    input logic tx_ready
     );
     
 localparam logic [47:0] SRC = 48'h00183E03E41B;
