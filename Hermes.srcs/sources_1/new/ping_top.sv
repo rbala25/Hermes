@@ -166,7 +166,7 @@ always_ff @(posedge tx_clk) begin //read
 end
 
 typedef enum logic [1:0] { 
-    idle, tx_start, tx_wait 
+    idle, tx_wait 
 } state_t;
 state_t state;
  
@@ -197,5 +197,148 @@ always_ff @(posedge tx_clk) begin
         endcase
     end
 end
+
+mii_rx u_mii_rx (
+    .data(mii_rx_data),
+    .valid(mii_rx_valid),
+    .frame_active(mii_rx_frame_active),
+    .rxclk(rx_clk),
+    .rxd(rxd),
+    .rx_dv(rx_dv),
+    .rx_er(1'b0),
+    .rst(rst)
+);
+ 
+eth_parser u_eth_parser (
+    .dest_mac(eth_dest_mac),
+    .src_mac(eth_src_mac),
+    .ether_type(eth_ether_type),
+    .header_valid(eth_header_valid),
+    .payload_data(eth_payload_data),
+    .payload_valid(eth_payload_valid),
+    .frame_done(eth_frame_done),
+    .error(eth_error),
+    .clk(rx_clk),
+    .rst(rst),
+    .data(mii_rx_data),
+    .valid(mii_rx_valid),
+    .frame_active(mii_rx_frame_active)
+);
+ 
+ip_parser u_ip_parser (
+    .clk(rx_clk),
+    .rst(rst),
+    .payload(eth_payload_data),
+    .payload_valid(eth_payload_valid),
+    .header_valid(eth_header_valid),
+    .ether(eth_ether_type),
+    .frame_done(eth_frame_done),
+    .error(eth_error),
+    .ip_version(ip_version),
+    .ip_ihl(ip_ihl),
+    .ip_dscp(ip_dscp),
+    .ip_total_len(ip_total_len),
+    .ip_id(ip_id),
+    .ip_flags(ip_flags),
+    .ip_frag_offset(ip_frag_offset),
+    .ip_ttl(ip_ttl),
+    .ip_protocol(ip_protocol),
+    .ip_checksum(ip_checksum),
+    .ip_src(ip_src),
+    .ip_dest(ip_dest),
+    .ip_header_valid(ip_header_valid),
+    .ip_checksum_val(ip_checksum_val),
+    .ip_is_fragment(ip_is_fragment),
+    .ip_payload_data(ip_payload_data),
+    .ip_payload_valid(ip_payload_valid),
+    .ip_payload_done(ip_payload_done),
+    .ip_error(ip_error)
+);
+ 
+icmp_parser u_icmp_parser (
+    .clk(rx_clk),
+    .rst(rst),
+    .payload(ip_payload_data),
+    .payload_valid(ip_payload_valid),
+    .ip_header_valid(ip_header_valid),
+    .ip_payload_done(ip_payload_done),
+    .ip_protocol(ip_protocol),
+    .error(ip_error),
+    .icmp_type(icmp_type),
+    .icmp_code(icmp_code),
+    .icmp_checksum(icmp_checksum_rx),
+    .icmp_identifier(icmp_identifier),
+    .icmp_seq_num(icmp_seq_num),
+    .icmp_header_valid(icmp_header_valid),
+    .icmp_checksum_val(icmp_checksum_val),
+    .icmp_payload_data(icmp_payload_data),
+    .icmp_payload_valid(icmp_payload_valid),
+    .icmp_payload_done(icmp_payload_done),
+    .icmp_error(icmp_error)
+);
+ 
+icmp_csum_adjust u_csum_adjust (
+    .csum_in(rep_icmp_checksum_rx),
+    .csum_out(icmp_checksum_tx)
+);
+ 
+icmp_tx u_icmp_tx (
+    .tx_clk(tx_clk),
+    .rst(rst),
+    .identifier(rep_identifier),
+    .seq(rep_seq),
+    .icmp_checksum(icmp_checksum_tx),
+    .start(icmp_tx_start),
+    .done(icmp_tx_done),
+    .payload_in_data(fifo_mem[fifo_rd_ptr]),
+    .payload_in_valid(fifo_valid_tx),
+    .payload_in_ready(fifo_ready_from_ictx),
+    .payload_data(ictx_data),
+    .payload_valid(ictx_valid),
+    .payload_ready(ictx_ready)
+);
+ 
+ip_tx u_ip_tx (
+    .tx_clk(tx_clk),
+    .rst(rst),
+    .src_ip(rep_src_ip),
+    .dst_ip(rep_dst_ip),
+    .protocol(8'h01),
+    .total_length(rep_total_len),
+    .identification(rep_ip_id),
+    .start(ip_tx_start),
+    .done(ip_tx_done),
+    .payload_data(ictx_data),
+    .payload_valid(ictx_valid),
+    .payload_ready(ictx_ready),
+    .tx_data(iptx_data),
+    .tx_valid(iptx_valid),
+    .tx_ready(iptx_ready)
+);
+ 
+eth_tx u_eth_tx (
+    .tx_clk(tx_clk),
+    .rst(rst),
+    .dst_mac(rep_dst_mac),
+    .ether_type(16'h0800),
+    .payload_data(iptx_data),
+    .payload_valid(iptx_valid),
+    .start(eth_tx_start),
+    .payload_ready(iptx_ready),
+    .done(eth_tx_done),
+    .txd(ethtx_data),
+    .tx_valid(ethtx_valid),
+    .tx_ready(ethtx_ready)
+);
+ 
+mii_tx u_mii_tx (
+    .tx_clk(tx_clk),
+    .rst(rst),
+    .data(ethtx_data),
+    .valid(ethtx_valid),
+    .ready(ethtx_ready),
+    .txd(txd),
+    .tx_en(tx_en)
+);
     
 endmodule
