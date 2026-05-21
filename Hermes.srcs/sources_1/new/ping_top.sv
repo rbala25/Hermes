@@ -104,8 +104,31 @@ logic [15:0] rep_seq;
 logic [15:0] rep_total_len;
 logic [15:0] rep_ip_id;
 logic [15:0] rep_icmp_checksum_rx;
+//assume stable before TX fires since header arrives before payload
 
 logic [15:0] icmp_checksum_tx;
+
+always_ff @(posedge rx_clk) begin
+    if (rst) begin
+        rep_dst_mac <=0;
+        rep_src_ip <=0;
+        rep_dst_ip <=0;
+        rep_identifier <=0;
+        rep_seq <=0;
+        rep_total_len <=0;
+        rep_ip_id <=0;
+        rep_icmp_checksum_rx <=0;
+    end else if (icmp_header_valid && icmp_type==8'h08 && icmp_code==8'h00) begin
+        rep_dst_mac <=eth_src_mac;
+        rep_src_ip <=ip_dest;
+        rep_dst_ip <=ip_src;
+        rep_identifier <=icmp_identifier;
+        rep_seq <=icmp_seq_num;
+        rep_total_len <=ip_total_len;
+        rep_ip_id <=ip_id;
+        rep_icmp_checksum_rx <=icmp_checksum_rx;
+    end
+end
 
 localparam FIFO_DEPTH = 256;
 localparam FIFO_AW = $clog2(FIFO_DEPTH);
@@ -126,19 +149,21 @@ end
 
 logic fifo_valid_tx;
 logic fifo_ready_from_ictx;
-assign fifo_valid_tx = (fifo_rd_ptr != fifo_wr_snap_tx); //1 - data to read
+assign fifo_valid_tx = (fifo_rd_ptr != fifo_wr_snap_tx);
  
 always_ff @(posedge rx_clk) begin //write
     if (rst) fifo_wr_ptr <=0;
+    else if (icmp_header_valid && icmp_type==8'h08 && icmp_code==8'h00) fifo_wr_ptr <=0;
     else if (icmp_payload_valid) begin
         fifo_mem[fifo_wr_ptr] <=icmp_payload_data;
         fifo_wr_ptr <=fifo_wr_ptr + 1'b1;
     end
 end
-
+ 
 always_ff @(posedge tx_clk) begin //read
     if (rst) fifo_rd_ptr <=0;
-    else if (fifo_valid_tx && fifo_ready_from_ictx) fifo_rd_ptr <= fifo_rd_ptr + 1'b1;
+    else if (fifo_valid_tx && fifo_ready_from_ictx) fifo_rd_ptr <=fifo_rd_ptr + 1'b1;
 end
+
     
 endmodule
