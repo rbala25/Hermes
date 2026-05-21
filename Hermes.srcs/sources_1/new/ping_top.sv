@@ -19,21 +19,19 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-
 module ping_top #(
     parameter logic [31:0] IP = 32'hC0A80164
     )(
     input logic tx_clk,
     input logic rx_clk,
-    input logic rst,
+    input logic rstb,
     output logic [3:0] txd,
     output logic tx_en,
     input logic [3:0] rxd,
-    input logic rx_dv,
-    input logic rstb
+    input logic rx_dv
     );
-    
-    
+
+logic rst;
 assign rst = ~rstb;
 
 logic [7:0] mii_rx_data; //mii_rx
@@ -101,7 +99,6 @@ logic ip_tx_start;
 logic eth_tx_start;
 
 logic [47:0] rep_dst_mac; //params for response
-logic [31:0] rep_src_ip;
 logic [31:0] rep_dst_ip;
 logic [15:0] rep_identifier;
 logic [15:0] rep_seq;
@@ -114,23 +111,21 @@ logic [15:0] icmp_checksum_tx;
 
 always_ff @(posedge rx_clk) begin
     if (rst) begin
-        rep_dst_mac <=0;
-        rep_src_ip <=0;
-        rep_dst_ip <=0;
-        rep_identifier <=0;
-        rep_seq <=0;
-        rep_total_len <=0;
-        rep_ip_id <=0;
-        rep_icmp_checksum_rx <=0;
+        rep_dst_mac          <= 0;
+        rep_dst_ip           <= 0;
+        rep_identifier       <= 0;
+        rep_seq              <= 0;
+        rep_total_len        <= 0;
+        rep_ip_id            <= 0;
+        rep_icmp_checksum_rx <= 0;
     end else if (icmp_header_valid && icmp_type==8'h08 && icmp_code==8'h00) begin
-        rep_dst_mac <=eth_src_mac;
-        rep_src_ip <=ip_dest;
-        rep_dst_ip <=ip_src;
-        rep_identifier <=icmp_identifier;
-        rep_seq <=icmp_seq_num;
-        rep_total_len <=ip_total_len;
-        rep_ip_id <=ip_id;
-        rep_icmp_checksum_rx <=icmp_checksum_rx;
+        rep_dst_mac          <= eth_src_mac;
+        rep_dst_ip           <= ip_src;
+        rep_identifier       <= icmp_identifier;
+        rep_seq              <= icmp_seq_num;
+        rep_total_len        <= ip_total_len;
+        rep_ip_id            <= ip_id;
+        rep_icmp_checksum_rx <= icmp_checksum_rx;
     end
 end
 
@@ -143,30 +138,54 @@ logic [FIFO_AW-1:0] fifo_rd_ptr; //tx_clk
 logic [FIFO_AW-1:0] fifo_wr_snap_meta, fifo_wr_snap_tx;
 always_ff @(posedge tx_clk) begin //metastability across clk domains
     if (rst) begin
-        fifo_wr_snap_meta <=0;
-        fifo_wr_snap_tx <=0;
+        fifo_wr_snap_meta <= 0;
+        fifo_wr_snap_tx   <= 0;
     end else begin
-        fifo_wr_snap_meta <=fifo_wr_ptr;
-        fifo_wr_snap_tx <=fifo_wr_snap_meta;
+        fifo_wr_snap_meta <= fifo_wr_ptr;
+        fifo_wr_snap_tx   <= fifo_wr_snap_meta;
     end
 end
 
 logic fifo_valid_tx;
 logic fifo_ready_from_ictx;
 assign fifo_valid_tx = (fifo_rd_ptr != fifo_wr_snap_tx);
+
+logic fifo_rst_wr; // rx_clk domain pulse
+logic fifo_rst_meta, fifo_rst_tx, fifo_rst_tx_r; // tx_clk domain sync + edge detect
+
+always_ff @(posedge rx_clk) begin
+    if (rst) fifo_rst_wr <= 0;
+    else fifo_rst_wr <= (icmp_header_valid && icmp_type==8'h08 && icmp_code==8'h00);
+end
+
+always_ff @(posedge tx_clk) begin
+    if (rst) begin
+        fifo_rst_meta <= 0;
+        fifo_rst_tx   <= 0;
+        fifo_rst_tx_r <= 0;
+    end else begin
+        fifo_rst_meta <= fifo_rst_wr;
+        fifo_rst_tx   <= fifo_rst_meta;
+        fifo_rst_tx_r <= fifo_rst_tx;
+    end
+end
+
+logic fifo_rd_rst; 
+assign fifo_rd_rst = fifo_rst_tx && !fifo_rst_tx_r;
  
 always_ff @(posedge rx_clk) begin //write
-    if (rst) fifo_wr_ptr <=0;
+    if (rst) fifo_wr_ptr <= 0;
     else if (icmp_header_valid && icmp_type==8'h08 && icmp_code==8'h00) fifo_wr_ptr <= 0;
     else if (icmp_payload_valid) begin
         fifo_mem[fifo_wr_ptr] <= icmp_payload_data;
-        fifo_wr_ptr <=fifo_wr_ptr + 1'b1;
+        fifo_wr_ptr <= fifo_wr_ptr + 1'b1;
     end
 end
  
 always_ff @(posedge tx_clk) begin //read
     if (rst) fifo_rd_ptr <= 0;
-    else if (fifo_valid_tx && fifo_ready_from_ictx) fifo_rd_ptr <= fifo_rd_ptr + 1'b1; //if not empty
+    else if (fifo_rd_rst) fifo_rd_ptr <= 0; //new packet: reset read pointer
+    else if (fifo_valid_tx && fifo_ready_from_ictx) fifo_rd_ptr <= fifo_rd_ptr + 1'b1;
 end
 
 typedef enum logic [1:0] { 
@@ -176,21 +195,21 @@ state_t state;
  
 always_ff @(posedge tx_clk) begin
     if (rst) begin
-        state <=idle;
+        state         <= idle;
         icmp_tx_start <= 0;
-        ip_tx_start <= 0;
-        eth_tx_start <= 0;
+        ip_tx_start   <= 0;
+        eth_tx_start  <= 0;
     end else begin
         icmp_tx_start <= 0;
-        ip_tx_start <= 0;
-        eth_tx_start <= 0;
+        ip_tx_start   <= 0;
+        eth_tx_start  <= 0;
  
         unique case (state)
             idle: if (fifo_valid_tx) begin //if payload there
                 icmp_tx_start <= 1;
-                ip_tx_start <= 1;
-                eth_tx_start <= 1;
-                state <= tx_wait;
+                ip_tx_start   <= 1;
+                eth_tx_start  <= 1;
+                state         <= tx_wait;
             end
  
             tx_wait: if (eth_tx_done) state <= idle;
@@ -301,7 +320,7 @@ icmp_tx u_icmp_tx (
 ip_tx u_ip_tx (
     .tx_clk(tx_clk),
     .rst(rst),
-    .src_ip(rep_src_ip),
+    .src_ip(IP),
     .dst_ip(rep_dst_ip),
     .protocol(8'h01),
     .total_length(rep_total_len),
@@ -340,5 +359,5 @@ mii_tx u_mii_tx (
     .txd(txd),
     .tx_en(tx_en)
 );
-    
+        
 endmodule
