@@ -106,5 +106,39 @@ logic [15:0] rep_ip_id;
 logic [15:0] rep_icmp_checksum_rx;
 
 logic [15:0] icmp_checksum_tx;
+
+localparam FIFO_DEPTH = 256;
+localparam FIFO_AW = $clog2(FIFO_DEPTH);
+logic [7:0] fifo_mem [0:FIFO_DEPTH-1];
+logic [FIFO_AW-1:0] fifo_wr_ptr; //rx_clk 
+logic [FIFO_AW-1:0] fifo_rd_ptr; //tx_clk
+
+logic [FIFO_AW-1:0] fifo_wr_snap_meta, fifo_wr_snap_tx;
+always_ff @(posedge tx_clk) begin //metastability across clk domains
+    if (rst) begin
+        fifo_wr_snap_meta <=0;
+        fifo_wr_snap_tx <=0;
+    end else begin
+        fifo_wr_snap_meta <=fifo_wr_ptr;
+        fifo_wr_snap_tx <=fifo_wr_snap_meta;
+    end
+end
+
+logic fifo_valid_tx;
+logic fifo_ready_from_ictx;
+assign fifo_valid_tx = (fifo_rd_ptr != fifo_wr_snap_tx); //1 - data to read
+ 
+always_ff @(posedge rx_clk) begin //write
+    if (rst) fifo_wr_ptr <=0;
+    else if (icmp_payload_valid) begin
+        fifo_mem[fifo_wr_ptr] <=icmp_payload_data;
+        fifo_wr_ptr <=fifo_wr_ptr + 1'b1;
+    end
+end
+
+always_ff @(posedge tx_clk) begin //read
+    if (rst) fifo_rd_ptr <=0;
+    else if (fifo_valid_tx && fifo_ready_from_ictx) fifo_rd_ptr <= fifo_rd_ptr + 1'b1;
+end
     
 endmodule
