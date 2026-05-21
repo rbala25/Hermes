@@ -153,17 +153,49 @@ assign fifo_valid_tx = (fifo_rd_ptr != fifo_wr_snap_tx);
  
 always_ff @(posedge rx_clk) begin //write
     if (rst) fifo_wr_ptr <=0;
-    else if (icmp_header_valid && icmp_type==8'h08 && icmp_code==8'h00) fifo_wr_ptr <=0;
+    else if (icmp_header_valid && icmp_type==8'h08 && icmp_code==8'h00) fifo_wr_ptr <= 0;
     else if (icmp_payload_valid) begin
-        fifo_mem[fifo_wr_ptr] <=icmp_payload_data;
+        fifo_mem[fifo_wr_ptr] <= icmp_payload_data;
         fifo_wr_ptr <=fifo_wr_ptr + 1'b1;
     end
 end
  
 always_ff @(posedge tx_clk) begin //read
-    if (rst) fifo_rd_ptr <=0;
-    else if (fifo_valid_tx && fifo_ready_from_ictx) fifo_rd_ptr <=fifo_rd_ptr + 1'b1;
+    if (rst) fifo_rd_ptr <= 0;
+    else if (fifo_valid_tx && fifo_ready_from_ictx) fifo_rd_ptr <= fifo_rd_ptr + 1'b1; //if not empty
 end
 
+typedef enum logic [1:0] { 
+    idle, tx_start, tx_wait 
+} state_t;
+state_t state;
+ 
+always_ff @(posedge tx_clk) begin
+    if (rst) begin
+        state <=idle;
+        icmp_tx_start <= 0;
+        ip_tx_start <= 0;
+        eth_tx_start <= 0;
+        fifo_rd_ptr <= 0;
+    end else begin
+        icmp_tx_start <= 0;
+        ip_tx_start <= 0;
+        eth_tx_start <= 0;
+ 
+        unique case (state)
+            idle: if (fifo_valid_tx) begin //if payload there
+                icmp_tx_start <= 1;
+                ip_tx_start <= 1;
+                eth_tx_start <= 1;
+                state <= tx_wait;
+            end
+ 
+            tx_wait: if (eth_tx_done) begin
+                fifo_rd_ptr <=0;
+                state <= idle;
+            end
+        endcase
+    end
+end
     
 endmodule
