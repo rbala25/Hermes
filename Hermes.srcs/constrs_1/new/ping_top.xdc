@@ -35,3 +35,10 @@ set_output_delay -clock tx_clk -min 0.0  [get_ports {txd[*] tx_en}]
 set_input_delay  -clock rx_clk -max 10.0 [get_ports rstb]
 set_input_delay  -clock rx_clk -min 0.0  [get_ports rstb]
 set_property -dict { PACKAGE_PIN C16 IOSTANDARD LVCMOS33 } [get_ports { eth_rstn }];
+
+set_property PACKAGE_PIN E3  [get_ports clk_100]
+set_property IOSTANDARD LVCMOS33 [get_ports clk_100]
+create_clock -period 10.000 -name clk_100 [get_ports clk_100]
+
+set_property PACKAGE_PIN G18 [get_ports eth_ref_clk]
+set_property IOSTANDARD LVCMOS33 [get_ports eth_ref_clk]

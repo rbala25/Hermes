@@ -22,6 +22,7 @@
 module ping_top #(
     parameter logic [31:0] IP = 32'hC0A80164
     )(
+    input logic clk_100, 
     input logic tx_clk,
     input logic rx_clk,
     input logic rstb,
@@ -29,8 +30,16 @@ module ping_top #(
     output logic tx_en,
     input logic [3:0] rxd,
     input logic rx_dv,
-    output logic eth_rstn
+    output logic eth_rstn,
+    output logic eth_ref_clk
     );
+    
+logic locked;
+clk_gen u_clk_gen (
+    .clk_100(clk_100),
+    .clk_25(eth_ref_clk),
+    .locked(locked)
+);
 
 logic rst;
 assign rst = ~rstb;
