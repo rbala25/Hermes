@@ -132,5 +132,33 @@ always_ff @(posedge rx_clk) begin
     end
 end
 
+//arp_toggle cdc sync
+logic toggle_meta, toggle_sync, toggle_prev;
+logic [47:0] sender_mac_cdc;
+logic [31:0] sender_ip_cdc;
+ 
+always_ff @(posedge tx_clk) begin
+    if (rst) begin
+        toggle_meta <= 0;
+        toggle_sync <= 0;
+        toggle_prev <= 0;
+        reply_dst_mac <= 0;
+        sender_mac_cdc <= 0;
+        sender_ip_cdc <= 0;
+    end else begin
+        toggle_meta <= arp_toggle_rx;
+        toggle_sync <= toggle_meta;
+        toggle_prev <= toggle_sync;
+ 
+        if (toggle_sync != toggle_prev) begin
+            reply_dst_mac <= sender_mac_rx; //sha
+            sender_mac_cdc <= sender_mac_rx;
+            sender_ip_cdc <= sender_ip_rx;
+        end
+    end
+end
+
+//tx
+
 
 endmodule
