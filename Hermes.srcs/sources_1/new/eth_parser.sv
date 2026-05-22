@@ -112,7 +112,7 @@ module eth_parser(output logic [47:0] dest_mac, output logic [47:0] src_mac, out
                             state <= payload;
                             header_valid <= 1;
                             fcs_count <= 0;
-                            $display("ETH: header_valid, ether_type=%04X t=%0t", {ether_type[7:0],data}, $time);
+//                            $display("ETH: header_valid, ether_type=%04X t=%0t", {ether_type[7:0],data}, $time);
                         end
                     end
                     
@@ -123,7 +123,7 @@ module eth_parser(output logic [47:0] dest_mac, output logic [47:0] src_mac, out
                         end else begin
                             payload_data <= fcs_buf[0];
                             payload_valid <= 1;
-                            $display("ETH: payload_valid, data=%02X t=%0t", fcs_buf[0], $time);
+//                            $display("ETH: payload_valid, data=%02X t=%0t", fcs_buf[0], $time);
                             
                             fcs_buf[0] <= fcs_buf[1];
                             fcs_buf[1] <= fcs_buf[2];

@@ -63,7 +63,7 @@ always_ff @(posedge tx_clk) begin
             idle: begin
                 cnt <= 0;
                 if(start) begin
-                    $display("ETH_TX: start fired t=%0t", $time);
+//                    $display("ETH_TX: start fired t=%0t", $time);
                     state <= dst;
                     txd <= dst_mac[47:40]; //drive first byte
                     tx_valid <= 1;
@@ -126,7 +126,7 @@ always_ff @(posedge tx_clk) begin
                 end
                 
                 if(tx_ready && !payload_valid) begin
-                    $display("ETH_TX: done fired tx_ready=%0d payload_valid=%0d t=%0t", tx_ready, payload_valid, $time);
+//                    $display("ETH_TX: done fired tx_ready=%0d payload_valid=%0d t=%0t", tx_ready, payload_valid, $time);
                     tx_valid <= 0;
                     done <= 1;
                     state <= idle;

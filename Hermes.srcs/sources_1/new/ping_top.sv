@@ -210,12 +210,12 @@ always_ff @(posedge tx_clk) begin
                 ip_tx_start <= 1;
                 eth_tx_start <= 1;
                 state <= tx_wait;
-                $display("TOP: TX fired t=%0t", $time);
+//                $display("TOP: TX fired t=%0t", $time);
             end
  
             tx_wait: begin 
                 if (eth_tx_done) state <= idle;
-                $display("TOP: eth_tx_done at t=%0t", $time);
+//                $display("TOP: eth_tx_done at t=%0t", $time);
             end
         endcase
     end

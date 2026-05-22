@@ -43,7 +43,7 @@ always_ff @(posedge rxclk) begin
         lower_nibble <= 4'h0;
     end else begin
         valid <= 0; //defaults
-        if (rx_dv) $display("MII_RX: clk tick, curr=%0d rx_dv=%0d t=%0t", curr, rx_dv, $time);  
+//        if (rx_dv) $display("MII_RX: clk tick, curr=%0d rx_dv=%0d t=%0t", curr, rx_dv, $time);  
         
         unique case(curr)
             idle: begin
@@ -87,7 +87,7 @@ always_ff @(posedge rxclk) begin
                     valid <= 1;
                     frame_active <= 1;
                     nibble_sel <= 0;
-                    $display("MII_RX: byte=%02X t=%0t", {rxd,lower_nibble}, $time);
+//                    $display("MII_RX: byte=%02X t=%0t", {rxd,lower_nibble}, $time);
                 end
             end
         endcase
