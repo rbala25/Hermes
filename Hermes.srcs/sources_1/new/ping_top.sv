@@ -28,11 +28,13 @@ module ping_top #(
     output logic [3:0] txd,
     output logic tx_en,
     input logic [3:0] rxd,
-    input logic rx_dv
+    input logic rx_dv,
+    output logic eth_rstn
     );
 
 logic rst;
 assign rst = ~rstb;
+assign eth_rstn = 1'b1;
 
 logic [7:0] mii_rx_data; //mii_rx
 logic mii_rx_valid;
