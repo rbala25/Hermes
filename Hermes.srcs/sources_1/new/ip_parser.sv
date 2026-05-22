@@ -237,6 +237,7 @@ always_ff @(posedge clk) begin
                     if(options_left == 0) begin //last byte
                         ip_checksum_val <= (next[15:0] == 16'hFFFF);
                         ip_header_valid <= 1;
+                        $display("IP: header_valid, proto=%02X src=%08X dst=%08X t=%0t", ip_protocol, {ip_src[23:0],payload}, {ip_dest[23:0],payload}, $time);
                         state <= PAYLOAD;
                     end else options_left <= options_left - 1;
                 end

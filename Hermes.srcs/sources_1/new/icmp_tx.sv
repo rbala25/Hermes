@@ -56,16 +56,16 @@ always_ff @(posedge tx_clk) begin
         payload_in_ready <= 0;
         done <= 0;
     end else begin
-        payload_valid <= 0;
         payload_in_ready <= 0;
         done <= 0;
         
         
         unique case (state) 
             idle: begin
+                payload_valid <= 0;
                 cnt <= 0;
                 if(start) begin
-                    payload_data <= 8'h08;
+                    payload_data <= 8'h00;
                     payload_valid <= 1;
                     cnt <= 1;
                     state <= header;
@@ -73,8 +73,8 @@ always_ff @(posedge tx_clk) begin
             end
             
             header: begin
+                payload_valid <= 1;
                 if (payload_ready) begin
-                    payload_valid <= 1;
                     cnt <= cnt + 1;
                     
                     unique case (cnt)
@@ -94,14 +94,15 @@ always_ff @(posedge tx_clk) begin
             end
             
             data: begin
+                if(payload_in_valid) payload_valid <= 1;
                 if(payload_ready && payload_in_valid) begin
                     payload_data <= payload_in_data;
-                    payload_valid <= 1;
                     payload_in_ready <= 1;
                 end
                 
                 if(payload_ready && !payload_in_valid) begin
                     done <= 1;
+                    payload_valid <= 0;
                     state <= idle;
                 end
             end

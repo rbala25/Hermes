@@ -71,7 +71,6 @@ always_ff @(posedge tx_clk) begin
         payload_ready <= 0;
         done <= 0;
     end else begin
-        tx_valid <= 0;
         payload_ready <= 0;
         done <= 0;
         
@@ -87,6 +86,7 @@ always_ff @(posedge tx_clk) begin
             end
             
             header: begin
+                tx_valid <= 1;
                 if(tx_ready) begin
                     tx_valid <= 1;
                     cnt <= cnt + 1;
@@ -120,16 +120,18 @@ always_ff @(posedge tx_clk) begin
             end
             
             data: begin
+                tx_valid <= 1;
                 if(tx_ready && payload_valid) begin
                     tx_data <= payload_data;
-                    tx_valid <= 1;
                     payload_ready <= 1;
                 end
                 
                 if(tx_ready && !payload_valid) begin
                     done <= 1;
                     state <= idle;
+                    tx_valid <= 0;
                 end
+
             end
         endcase
     end

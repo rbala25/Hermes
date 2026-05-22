@@ -190,6 +190,7 @@ module icmp_parser(
                         icmp_header_valid <= 1;
                         phase <= 0;
                         state <= s_payload;
+                        $display("ICMP: header_valid, type=%02X code=%02X id=%04X seq=%04X t=%0t", icmp_type, icmp_code, icmp_identifier, {icmp_seq_num[15:8],payload}, $time); 
                     end
                 end
                 

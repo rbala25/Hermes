@@ -42,6 +42,7 @@ logic [7:0] byte_buf;
 
 always_ff @(posedge tx_clk) begin
     if(rst) begin
+        $display("MII_TX: RESET at t=%0t", $time); //bro wtf
         state <= idle;
         cnt <= 0;
         nibble_sel <= 0;
@@ -59,6 +60,7 @@ always_ff @(posedge tx_clk) begin
                 nibble_sel <= 0;
                 cnt <= 0;
                 if(valid) begin
+                    $display("MII_TX: starting, valid=%0d t=%0t", valid, $time);
                     state <= preamble;
                 end
             end
@@ -66,6 +68,7 @@ always_ff @(posedge tx_clk) begin
             preamble: begin //7 bytes 0x55, then 0xD5 (lower nibble (5) first)
                 tx_en <= 1;
                 cnt <= cnt + 1;
+                $display("MII_TX: preamble cnt=%0d valid=%0d t=%0t", cnt, valid, $time);
                 if(cnt == 15)begin
                     txd <= 4'hd;
                     byte_buf <= data;
@@ -85,7 +88,10 @@ always_ff @(posedge tx_clk) begin
                     nibble_sel <= ~nibble_sel;
                     ready <= 1;
                     if(valid) byte_buf <= data;
-                    else state <= idle;
+                    else begin 
+                        $display("MII_TX: valid dropped in transmit t=%0t", $time);
+                         state <= idle; 
+                     end
                 end
             end
         endcase

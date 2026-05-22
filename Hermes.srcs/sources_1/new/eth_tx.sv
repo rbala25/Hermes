@@ -63,6 +63,7 @@ always_ff @(posedge tx_clk) begin
             idle: begin
                 cnt <= 0;
                 if(start) begin
+                    $display("ETH_TX: start fired t=%0t", $time);
                     state <= dst;
                     txd <= dst_mac[47:40]; //drive first byte
                     tx_valid <= 1;
@@ -71,6 +72,7 @@ always_ff @(posedge tx_clk) begin
             end
             
             dst: begin
+                tx_valid <= 1;
                 if (tx_ready) begin
                     if(cnt < 5) begin
                         txd <= dst_mac[47 - cnt*8 -: 8];
@@ -86,6 +88,7 @@ always_ff @(posedge tx_clk) begin
             end
             
             src: begin
+                tx_valid <= 1;
                 if (tx_ready) begin
                     if(cnt < 5) begin
                         txd <= SRC[47 - cnt*8 -: 8];
@@ -101,8 +104,8 @@ always_ff @(posedge tx_clk) begin
             end
             
             ether: begin
+                tx_valid <= 1;
                 if(tx_ready) begin
-                    tx_valid <= 1;
                     if(cnt) begin
                         txd <= ether_type[7:0];
                         cnt <= 0;
@@ -116,13 +119,15 @@ always_ff @(posedge tx_clk) begin
             end
             
             payload: begin
+                tx_valid <= 1;
                 if(tx_ready && payload_valid) begin
-                    tx_valid <= 1;
                     txd <= payload_data;
                     payload_ready <= 1;
                 end
                 
                 if(tx_ready && !payload_valid) begin
+                    $display("ETH_TX: done fired tx_ready=%0d payload_valid=%0d t=%0t", tx_ready, payload_valid, $time);
+                    tx_valid <= 0;
                     done <= 1;
                     state <= idle;
                 end

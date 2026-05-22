@@ -111,20 +111,20 @@ logic [15:0] icmp_checksum_tx;
 
 always_ff @(posedge rx_clk) begin
     if (rst) begin
-        rep_dst_mac          <= 0;
-        rep_dst_ip           <= 0;
-        rep_identifier       <= 0;
-        rep_seq              <= 0;
-        rep_total_len        <= 0;
-        rep_ip_id            <= 0;
+        rep_dst_mac <= 0;
+        rep_dst_ip <= 0;
+        rep_identifier <= 0;
+        rep_seq <= 0;
+        rep_total_len <= 0;
+        rep_ip_id <= 0;
         rep_icmp_checksum_rx <= 0;
     end else if (icmp_header_valid && icmp_type==8'h08 && icmp_code==8'h00) begin
-        rep_dst_mac          <= eth_src_mac;
-        rep_dst_ip           <= ip_src;
-        rep_identifier       <= icmp_identifier;
-        rep_seq              <= icmp_seq_num;
-        rep_total_len        <= ip_total_len;
-        rep_ip_id            <= ip_id;
+        rep_dst_mac <= eth_src_mac;
+        rep_dst_ip <= ip_src;
+        rep_identifier <= icmp_identifier;
+        rep_seq <= icmp_seq_num;
+        rep_total_len <= ip_total_len;
+        rep_ip_id <= ip_id;
         rep_icmp_checksum_rx <= icmp_checksum_rx;
     end
 end
@@ -139,10 +139,10 @@ logic [FIFO_AW-1:0] fifo_wr_snap_meta, fifo_wr_snap_tx;
 always_ff @(posedge tx_clk) begin //metastability across clk domains
     if (rst) begin
         fifo_wr_snap_meta <= 0;
-        fifo_wr_snap_tx   <= 0;
+        fifo_wr_snap_tx <= 0;
     end else begin
         fifo_wr_snap_meta <= fifo_wr_ptr;
-        fifo_wr_snap_tx   <= fifo_wr_snap_meta;
+        fifo_wr_snap_tx <= fifo_wr_snap_meta;
     end
 end
 
@@ -161,11 +161,11 @@ end
 always_ff @(posedge tx_clk) begin
     if (rst) begin
         fifo_rst_meta <= 0;
-        fifo_rst_tx   <= 0;
+        fifo_rst_tx <= 0;
         fifo_rst_tx_r <= 0;
     end else begin
         fifo_rst_meta <= fifo_rst_wr;
-        fifo_rst_tx   <= fifo_rst_meta;
+        fifo_rst_tx <= fifo_rst_meta;
         fifo_rst_tx_r <= fifo_rst_tx;
     end
 end
@@ -195,24 +195,28 @@ state_t state;
  
 always_ff @(posedge tx_clk) begin
     if (rst) begin
-        state         <= idle;
+        state <= idle;
         icmp_tx_start <= 0;
-        ip_tx_start   <= 0;
-        eth_tx_start  <= 0;
+        ip_tx_start <= 0;
+        eth_tx_start <= 0;
     end else begin
         icmp_tx_start <= 0;
-        ip_tx_start   <= 0;
-        eth_tx_start  <= 0;
+        ip_tx_start <= 0;
+        eth_tx_start <= 0;
  
         unique case (state)
             idle: if (fifo_valid_tx) begin //if payload there
                 icmp_tx_start <= 1;
-                ip_tx_start   <= 1;
-                eth_tx_start  <= 1;
-                state         <= tx_wait;
+                ip_tx_start <= 1;
+                eth_tx_start <= 1;
+                state <= tx_wait;
+                $display("TOP: TX fired t=%0t", $time);
             end
  
-            tx_wait: if (eth_tx_done) state <= idle;
+            tx_wait: begin 
+                if (eth_tx_done) state <= idle;
+                $display("TOP: eth_tx_done at t=%0t", $time);
+            end
         endcase
     end
 end

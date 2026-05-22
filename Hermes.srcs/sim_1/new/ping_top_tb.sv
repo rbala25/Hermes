@@ -22,7 +22,6 @@
 
 module ping_top_tb;
 
-
 logic tx_clk = 0;
 logic rx_clk = 0;
 always #20 tx_clk = ~tx_clk;
@@ -57,8 +56,8 @@ always @(posedge tx_clk) begin
             nibble_phase <= 1;
         end else begin
             rx_captured[rx_cap_len] <= {txd, nibble_buf};
-            rx_cap_len              <= rx_cap_len + 1;
-            nibble_phase            <= 0;
+            rx_cap_len <= rx_cap_len + 1;
+            nibble_phase <= 0;
         end
     end else begin
         nibble_phase <= 0;
@@ -129,11 +128,25 @@ task automatic build_frame;
     fcs[0]=8'h00; fcs[1]=8'h00; fcs[2]=8'h00; fcs[3]=8'h00; //dummy fcs
 endtask
 
+//task automatic send_ping;
+//    send_preamble();
+//    foreach(frame[i]) send_byte(frame[i]);
+//    foreach(icmp_payload[i]) send_byte(icmp_payload[i]);
+//    foreach(fcs[i]) send_byte(fcs[i]);        
+//    end_frame();
+//endtask
+
 task automatic send_ping;
-    send_preamble();
-    foreach(frame[i]) send_byte(frame[i]);
+    // assert rx_dv one cycle before first nibble so mii_rx sees it in idle state
+    @(negedge rx_clk);
+    rx_dv = 1;
+    rxd   = 0;
+//    @(negedge rx_clk);
+    repeat(7) send_byte(8'h55);
+    send_byte(8'hD5);
+    foreach(frame[i])        send_byte(frame[i]);
     foreach(icmp_payload[i]) send_byte(icmp_payload[i]);
-    foreach(fcs[i]) send_byte(fcs[i]);        
+    foreach(fcs[i])          send_byte(fcs[i]);
     end_frame();
 endtask
 
@@ -228,19 +241,21 @@ initial begin
     repeat(10) @(posedge rx_clk);
     rstb = 1;
     repeat(5) @(posedge rx_clk);
-
+    
+    $display("INFO: starting stimulus at %0t", $time);
     build_frame();
+    $display("INFO: rx_dv before send = %0d at %0t", rx_dv, $time);
     send_ping();
+    $display("INFO: rx_dv after send = %0d at %0t", rx_dv, $time);
+    $display("INFO: frame sent at %0t", $time);
 
     //wait for tx_en to go high then go low (frame complete)
     @(posedge tx_en);
     $display("INFO: TX started at %0t", $time);
-    @(negedge tx_en);
+    repeat(400) @(posedge tx_clk);
     $display("INFO: TX done at %0t, captured %0d bytes", $time, rx_cap_len);
-
-    repeat(5) @(posedge tx_clk); // let capture settle
     check_reply();
-
+    
     $display("INFO: all checks done");
     $finish;
 end
