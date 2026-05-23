@@ -41,8 +41,7 @@ module arp_handler #(
     output logic done,
     output logic [7:0] payload_data, //28-byte ARP payload
     output logic payload_valid,
-    input logic payload_ready,
-    output logic dbg_arp_ok
+    input logic payload_ready
 );
 
 //rx side
