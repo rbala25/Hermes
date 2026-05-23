@@ -39,12 +39,12 @@ module eth_tx(
     
 localparam logic [47:0] SRC = 48'h00183E03E41B;
 
-function automatic [31:0] crc32_byte(input [31:0] crc_in, input [7:0] data);
+function automatic [31:0] crc32_byte(input [31:0] crc_in, input [7:0] data); //according to spec
     logic [31:0] c;
     c = crc_in;
     for (int i = 0; i < 8; i++) begin
         if (c[0] ^ data[i]) c = {1'b0, c[31:1]} ^ 32'hEDB88320;
-        else                 c = {1'b0, c[31:1]};
+        else c = {1'b0, c[31:1]};
     end
     return c;
 endfunction
@@ -154,7 +154,7 @@ always_ff @(posedge tx_clk) begin
                         payload_ready <= 1;
                         if (pl_cnt < 46) pl_cnt <= pl_cnt + 1;
                     end else if (pl_cnt < 46) begin
-                        txd <= 8'h00; //no padding
+                        txd <= 8'h00; //padding w zero to get to minimum size (60 bytes + FCS)
                         pl_cnt <= pl_cnt + 1;
                     end else begin //append fcs
                         fcs_latch <= ~crc_next;
@@ -169,10 +169,22 @@ always_ff @(posedge tx_clk) begin
                 tx_valid <= 1;
                 if (tx_ready) begin
                     case (fcs_cnt)
-                        2'd1: begin txd <= fcs_latch[15:8]; fcs_cnt <= 2; end
-                        2'd2: begin txd <= fcs_latch[23:16]; fcs_cnt <= 3; end
-                        2'd3: begin txd <= fcs_latch[31:24]; fcs_cnt <= 0; end
-                        2'd0: begin tx_valid <= 0; done <= 1; state <= idle; end
+                        2'd1: begin 
+                            txd <= fcs_latch[15:8]; 
+                            fcs_cnt <= 2; 
+                        end
+                        2'd2: begin 
+                            txd <= fcs_latch[23:16]; 
+                            fcs_cnt <= 3; 
+                        end
+                        2'd3: begin 
+                            txd <= fcs_latch[31:24]; 
+                            fcs_cnt <= 0; 
+                        end
+                        2'd0: begin tx_valid <= 0; 
+                            done <= 1; 
+                            state <= idle; 
+                        end
                     endcase
                 end
             end
