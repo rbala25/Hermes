@@ -46,7 +46,7 @@ clk_gen u_clk_gen (
 );
 
 logic rst;
-assign rst = ~rstb;
+assign rst = rstb;
 
 logic rx_clk_buf;
 BUFG u_rx_clk_buf (.I(rx_clk), .O(rx_clk_buf));
@@ -461,16 +461,15 @@ mdio_init u_mdio_init (
     .done(mdio_done)
 );
 
-assign led[0] = arp_pending;
+//assign led[0] = arp_pending;
 //assign led[1] = eth_header_valid;
 
-//logic eth_hv_seen;
-//always_ff @(posedge rx_clk) begin
-//    if (rst) eth_hv_seen <= 0;
-//    else if (eth_header_valid) eth_hv_seen <= 1;
-//end
-
-//assign led[1] = eth_hv_seen;
+logic eth_hv_seen;
+always_ff @(posedge rx_clk_buf) begin  // rx_clk_buf, not rx_clk
+    if (rst) eth_hv_seen <= 0;
+    else if (eth_header_valid) eth_hv_seen <= 1;
+end
+assign led[0] = eth_hv_seen;
 
 logic mii_rx_seen;
 always_ff @(posedge rx_clk_buf) begin
