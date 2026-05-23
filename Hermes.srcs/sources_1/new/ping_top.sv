@@ -45,7 +45,21 @@ clk_gen u_clk_gen (
 
 logic rst;
 assign rst = ~rstb;
-assign eth_rstn = 1'b1;
+
+logic [19:0] rst_cnt;
+logic phy_rstn;
+
+always_ff @(posedge clk_100) begin
+    if (!locked) begin
+        rst_cnt <= 0;
+        phy_rstn <= 0;
+    end else if (!phy_rstn) begin
+        rst_cnt <= rst_cnt + 1;
+        if (rst_cnt == 20'hFFFFF) phy_rstn <= 1;
+    end
+end
+
+assign eth_rstn = phy_rstn;
 
 logic [7:0] mii_rx_data; //mii_rx
 logic mii_rx_valid;
@@ -433,8 +447,32 @@ arp_handler #(
 );
 
 assign led[0] = arp_pending;
-assign led[1] = eth_header_valid;
+//assign led[1] = eth_header_valid;
+
+//logic eth_hv_seen;
+//always_ff @(posedge rx_clk) begin
+//    if (rst) eth_hv_seen <= 0;
+//    else if (eth_header_valid) eth_hv_seen <= 1;
+//end
+
+//assign led[1] = eth_hv_seen;
+
+logic mii_rx_seen;
+always_ff @(posedge rx_clk) begin
+    if (rst) mii_rx_seen <= 0;
+    else if (mii_rx_valid) mii_rx_seen <= 1;
+end
+
+assign led[1] = mii_rx_seen;
+
 assign led[2] = locked;
-assign led[3] = tx_is_arp;
+//assign led[3] = tx_is_arp;
+logic rx_dv_seen;
+always_ff @(posedge rx_clk) begin
+    if (rst) rx_dv_seen <= 0;
+    else if (rx_dv) rx_dv_seen <= 1;
+end
+
+assign led[3] = rx_dv_seen;
         
 endmodule
