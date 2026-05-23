@@ -479,8 +479,9 @@ end
 assign led[1] = mdio_done;
 
 assign led[2] = locked;
-//assign led[3] = tx_is_arp;
+//assign led[3] = tx_is_arp; 
 logic rx_dv_seen;
+
 always_ff @(posedge rx_clk) begin
     if (rst) rx_dv_seen <= 0;
     else if (rx_dv) rx_dv_seen <= 1;
