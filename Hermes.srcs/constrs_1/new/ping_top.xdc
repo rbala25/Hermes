@@ -42,3 +42,11 @@ create_clock -period 10.000 -name clk_100 [get_ports clk_100]
 
 set_property PACKAGE_PIN G18 [get_ports eth_ref_clk]
 set_property IOSTANDARD LVCMOS33 [get_ports eth_ref_clk]
+
+set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets eth_ref_clk]
+
+set_property PACKAGE_PIN H5  [get_ports {led[0]}]
+set_property PACKAGE_PIN J5  [get_ports {led[1]}]
+set_property PACKAGE_PIN T9  [get_ports {led[2]}]
+set_property PACKAGE_PIN T10 [get_ports {led[3]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {led[*]}]

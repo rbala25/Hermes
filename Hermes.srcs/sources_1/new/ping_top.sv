@@ -32,7 +32,8 @@ module ping_top #(
     input logic [3:0] rxd,
     input logic rx_dv,
     output logic eth_rstn,
-    output logic eth_ref_clk
+    output logic eth_ref_clk,
+    output logic [3:0] led
     );
     
 logic locked;
@@ -430,5 +431,10 @@ arp_handler #(
     .payload_valid(arp_payload_valid),
     .payload_ready(arp_payload_ready)
 );
+
+assign led[0] = arp_pending;
+assign led[1] = eth_header_valid;
+assign led[2] = locked;
+assign led[3] = tx_is_arp;
         
 endmodule
