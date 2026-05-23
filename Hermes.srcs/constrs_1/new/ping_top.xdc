@@ -50,3 +50,8 @@ set_property PACKAGE_PIN J5  [get_ports {led[1]}]
 set_property PACKAGE_PIN T9  [get_ports {led[2]}]
 set_property PACKAGE_PIN T10 [get_ports {led[3]}]
 set_property IOSTANDARD LVCMOS33 [get_ports {led[*]}]
+
+set_property PACKAGE_PIN F16 [get_ports eth_mdc]
+set_property IOSTANDARD LVCMOS33 [get_ports eth_mdc]
+set_property PACKAGE_PIN K13 [get_ports eth_mdio]
+set_property IOSTANDARD LVCMOS33 [get_ports eth_mdio]

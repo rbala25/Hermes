@@ -33,7 +33,9 @@ module ping_top #(
     input logic rx_dv,
     output logic eth_rstn,
     output logic eth_ref_clk,
-    output logic [3:0] led
+    output logic [3:0] led,
+    output logic eth_mdc,
+    output logic eth_mdio
     );
     
 logic locked;
@@ -446,6 +448,16 @@ arp_handler #(
     .payload_ready(arp_payload_ready)
 );
 
+logic mdio_done;
+
+mdio_init u_mdio_init (
+    .clk(clk_100),
+    .rst(!phy_rstn),
+    .mdc(eth_mdc),
+    .mdio(eth_mdio),
+    .done(mdio_done)
+);
+
 assign led[0] = arp_pending;
 //assign led[1] = eth_header_valid;
 
@@ -463,7 +475,8 @@ always_ff @(posedge rx_clk) begin
     else if (mii_rx_valid) mii_rx_seen <= 1;
 end
 
-assign led[1] = mii_rx_seen;
+//assign led[1] = mii_rx_seen;
+assign led[1] = mdio_done;
 
 assign led[2] = locked;
 //assign led[3] = tx_is_arp;
