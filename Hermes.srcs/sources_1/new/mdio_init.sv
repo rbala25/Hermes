@@ -28,9 +28,12 @@ module mdio_init(
     output logic done
     );
     
-localparam [63:0] FRAME = {32'hFFFFFFFF, 2'b01, 2'b01, 5'd1, 5'd0, 2'b10, 16'h8000};
+localparam [127:0] FRAMES = {
+    32'hFFFFFFFF, 2'b01, 2'b01, 5'd1, 5'd23, 2'b10, 16'h0000, //Reg=0x17, Data=0x0000 (force MII mode)
+    32'hFFFFFFFF, 2'b01, 2'b01, 5'd1, 5'd0,  2'b10, 16'h8000 //reset
+};
 localparam int HALF = 25; //100MHz/50 = 2MHz MDC
-localparam int NBITS = 64;
+localparam int NBITS = 128 ;
 localparam int WAIT_CYC = 100000; //1ms startup delay
  
 typedef enum logic [1:0] {
@@ -59,7 +62,7 @@ always_ff @(posedge clk) begin
                 wait_cnt <= wait_cnt + 1;
                 if (wait_cnt == WAIT_CYC - 1) begin
                     state <= SEND;
-                    mdio <= FRAME[NBITS-1]; //preload
+                    mdio <= FRAMES[NBITS-1]; //preload
                 end
             end
  
@@ -75,7 +78,7 @@ always_ff @(posedge clk) begin
                         mdio <= 1; //release
                     end else begin
                         bit_cnt <= bit_cnt + 1;
-                        mdio <= FRAME[NBITS - 2 - bit_cnt];
+                        mdio <= FRAMES[NBITS - 2 - bit_cnt];
                     end
                 end
             end
