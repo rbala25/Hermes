@@ -56,5 +56,3 @@ set_property IOSTANDARD LVCMOS33 [get_ports eth_mdc]
 set_property PACKAGE_PIN K13 [get_ports eth_mdio]
 set_property IOSTANDARD LVCMOS33 [get_ports eth_mdio]
 
-set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets rx_clk]
-create_generated_clock -name rx_clk_buf -source [get_ports rx_clk] -divide_by 1 [get_pins u_rx_clk_buf/O]

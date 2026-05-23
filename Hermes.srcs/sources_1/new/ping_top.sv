@@ -48,8 +48,8 @@ clk_gen u_clk_gen (
 logic rst;
 assign rst = rstb;
 
-logic rx_clk_buf;
-BUFG u_rx_clk_buf (.I(rx_clk), .O(rx_clk_buf));
+//logic rx_clk_buf;
+//BUFG u_rx_clk_buf (.I(rx_clk), .O(rx_clk_buf));
 
 logic [19:0] rst_cnt;
 logic phy_rstn;
@@ -164,7 +164,7 @@ assign arp_payload_ready = tx_is_arp ? mux_payload_ready : 1'b0;
 
 logic [15:0] icmp_checksum_tx;
 
-always_ff @(posedge rx_clk_buf) begin
+always_ff @(posedge rx_clk) begin
     if (rst) begin
         rep_dst_mac <= 0;
         rep_dst_ip <= 0;
@@ -208,7 +208,7 @@ assign fifo_valid_tx = (fifo_rd_ptr != fifo_wr_snap_tx);
 logic fifo_rst_wr; // rx_clk domain pulse
 logic fifo_rst_meta, fifo_rst_tx, fifo_rst_tx_r; // tx_clk domain sync + edge detect
 
-always_ff @(posedge rx_clk_buf) begin
+always_ff @(posedge rx_clk) begin
     if (rst) fifo_rst_wr <= 0;
     else fifo_rst_wr <= (icmp_header_valid && icmp_type==8'h08 && icmp_code==8'h00);
 end
@@ -228,7 +228,7 @@ end
 logic fifo_rd_rst; 
 assign fifo_rd_rst = fifo_rst_tx && !fifo_rst_tx_r;
  
-always_ff @(posedge rx_clk_buf) begin //write
+always_ff @(posedge rx_clk) begin //write
     if (rst) fifo_wr_ptr <= 0;
     else if (icmp_header_valid && icmp_type==8'h08 && icmp_code==8'h00) fifo_wr_ptr <= 0;
     else if (icmp_payload_valid) begin
@@ -290,7 +290,7 @@ mii_rx u_mii_rx (
     .data(mii_rx_data),
     .valid(mii_rx_valid),
     .frame_active(mii_rx_frame_active),
-    .rxclk(rx_clk_buf),
+    .rxclk(rx_clk),
     .rxd(rxd),
     .rx_dv(rx_dv),
     .rx_er(1'b0),
@@ -306,7 +306,7 @@ eth_parser u_eth_parser (
     .payload_valid(eth_payload_valid),
     .frame_done(eth_frame_done),
     .error(eth_error),
-    .clk(rx_clk_buf),
+    .clk(rx_clk),
     .rst(rst),
     .data(mii_rx_data),
     .valid(mii_rx_valid),
@@ -314,7 +314,7 @@ eth_parser u_eth_parser (
 );
  
 ip_parser u_ip_parser (
-    .clk(rx_clk_buf),
+    .clk(rx_clk),
     .rst(rst),
     .payload(eth_payload_data),
     .payload_valid(eth_payload_valid),
@@ -344,7 +344,7 @@ ip_parser u_ip_parser (
 );
  
 icmp_parser u_icmp_parser (
-    .clk(rx_clk_buf),
+    .clk(rx_clk),
     .rst(rst),
     .payload(ip_payload_data),
     .payload_valid(ip_payload_valid),
@@ -433,7 +433,7 @@ arp_handler #(
     .MY_IP(IP),
     .MY_MAC(MAC)
 ) u_arp_handler (
-    .rx_clk(rx_clk_buf),
+    .rx_clk(rx_clk),
     .tx_clk(tx_clk),
     .rst(rst),
     .eth_ether_type(eth_ether_type),
@@ -465,7 +465,7 @@ mdio_init u_mdio_init (
 //assign led[1] = eth_header_valid;
 
 //logic eth_hv_seen;
-//always_ff @(posedge rx_clk_buf) begin  // rx_clk_buf, not rx_clk
+//always_ff @(posedge rx_clk_buf) begin 
 //    if (rst) eth_hv_seen <= 0;
 //    else if (eth_header_valid) eth_hv_seen <= 1;
 //end
@@ -498,7 +498,7 @@ end
 ////assign led[3] = tx_is_arp; 
 logic rx_dv_seen;
 
-always_ff @(posedge rx_clk_buf) begin
+always_ff @(posedge rx_clk) begin
     if (rst) rx_dv_seen <= 0;
     else if (rx_dv) rx_dv_seen <= 1;
 end
