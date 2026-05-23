@@ -59,9 +59,9 @@ localparam [127:0] FRAMES_P3 = {
  
 localparam int HALF = 25; //100MHz/50 = 2MHz MDC
 localparam int NBITS = 128;
-localparam int WAIT1_CYC = 5000000;
-localparam int WAIT2_CYC = 200000000; 
-localparam int WAIT3_CYC = 10000000;
+localparam int WAIT1_CYC = 500000;
+localparam int WAIT2_CYC = 1000000; 
+localparam int WAIT3_CYC = 500000;
  
 typedef enum logic [2:0] {
     WAIT1,
@@ -74,7 +74,7 @@ typedef enum logic [2:0] {
 } state_t;
  
 state_t state;
-logic [27:0] wait_cnt;
+logic [20:0] wait_cnt;
 logic [5:0] phase;
 logic [6:0] bit_cnt;
  

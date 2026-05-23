@@ -483,19 +483,19 @@ always_ff @(posedge tx_clk) begin
     if (rst) arp_pending_seen <= 0;
     else if (arp_pending) arp_pending_seen <= 1;
 end
-assign led[0] = arp_pending_seen;
+//assign led[0] = arp_pending_seen;
 
-logic mii_rx_seen;
-always_ff @(posedge rx_clk_buf) begin
-    if (rst) mii_rx_seen <= 0;
-    else if (mii_rx_valid) mii_rx_seen <= 1;
-end
+//logic mii_rx_seen;
+//always_ff @(posedge rx_clk_buf) begin
+//    if (rst) mii_rx_seen <= 0;
+//    else if (mii_rx_valid) mii_rx_seen <= 1;
+//end
 
-//assign led[1] = mii_rx_seen;
-assign led[1] = mdio_done;
+////assign led[1] = mii_rx_seen;
+//assign led[1] = mdio_done;
 
-assign led[2] = locked;
-//assign led[3] = tx_is_arp; 
+//assign led[2] = locked;
+////assign led[3] = tx_is_arp; 
 logic rx_dv_seen;
 
 always_ff @(posedge rx_clk_buf) begin
@@ -503,7 +503,7 @@ always_ff @(posedge rx_clk_buf) begin
     else if (rx_dv) rx_dv_seen <= 1;
 end
 
-assign led[3] = rx_dv_seen;
+//assign led[3] = rx_dv_seen;
 
 //logic rx_clk_r;
 //logic rx_clk_seen;
@@ -513,4 +513,9 @@ assign led[3] = rx_dv_seen;
 //    else if (rx_clk & ~rx_clk_r) rx_clk_seen <= 1;
 //end
 //assign led[3] = rx_clk_seen;
+
+assign led[0] = mdio_done;//PHY init complete
+assign led[1] = locked; //PLL locked
+assign led[2] = rx_dv_seen; //Any RX traffic seen (from PC)
+assign led[3] = arp_pending_seen; //ARP request received and queued 
 endmodule
