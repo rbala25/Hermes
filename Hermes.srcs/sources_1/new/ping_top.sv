@@ -488,5 +488,4 @@ always_ff @(posedge rx_clk) begin
 end
 
 assign led[3] = rx_dv_seen;
-        
 endmodule
