@@ -464,12 +464,19 @@ mdio_init u_mdio_init (
 //assign led[0] = arp_pending;
 //assign led[1] = eth_header_valid;
 
-logic eth_hv_seen;
-always_ff @(posedge rx_clk_buf) begin  // rx_clk_buf, not rx_clk
-    if (rst) eth_hv_seen <= 0;
-    else if (eth_header_valid) eth_hv_seen <= 1;
+//logic eth_hv_seen;
+//always_ff @(posedge rx_clk_buf) begin  // rx_clk_buf, not rx_clk
+//    if (rst) eth_hv_seen <= 0;
+//    else if (eth_header_valid) eth_hv_seen <= 1;
+//end
+//assign led[0] = eth_hv_seen;
+
+logic arp_etype_seen;
+always_ff @(posedge rx_clk_buf) begin
+    if (rst) arp_etype_seen <= 0;
+    else if (eth_header_valid && eth_ether_type == 16'h0806) arp_etype_seen <= 1;
 end
-assign led[0] = eth_hv_seen;
+assign led[0] = arp_etype_seen;
 
 logic mii_rx_seen;
 always_ff @(posedge rx_clk_buf) begin

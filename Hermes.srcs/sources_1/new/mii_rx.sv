@@ -46,10 +46,21 @@ always_ff @(posedge rxclk) begin
 //        if (rx_dv) $display("MII_RX: clk tick, curr=%0d rx_dv=%0d t=%0t", curr, rx_dv, $time);  
         
         unique case(curr)
+//            idle: begin
+//                frame_active <= 0;
+//                nibble_sel <= 0;
+//                if(rx_dv) curr <= preamble;
+//            end
+
             idle: begin
                 frame_active <= 0;
-                nibble_sel <= 0;
-                if(rx_dv) curr <= preamble;
+                if (rx_dv) begin
+                    lower_nibble <= rxd;
+                    nibble_sel <= 1;
+                    curr <= preamble;
+                end else begin
+                    nibble_sel <= 0;
+                end
             end
 
             preamble: begin
