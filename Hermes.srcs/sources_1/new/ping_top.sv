@@ -20,7 +20,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 module ping_top #(
-    parameter logic [31:0] IP = 32'hC0A80164
+    parameter logic [31:0] IP = 32'hC0A80164,
+    parameter logic [47:0] MAC = 48'h00183E03E41B
     )(
     input logic clk_100, 
     input logic tx_clk,
@@ -118,6 +119,29 @@ logic [15:0] rep_ip_id;
 logic [15:0] rep_icmp_checksum_rx;
 //assume stable before TX fires since header arrives before payload
 
+logic [47:0] arp_reply_dst_mac; //arp signals
+logic arp_pending;
+logic arp_start;
+logic arp_done;
+logic [7:0] arp_payload_data;
+logic arp_payload_valid;
+logic arp_payload_ready; 
+
+logic tx_is_arp;
+logic [47:0] mux_dst_mac;
+logic [15:0] mux_ether_type;
+logic [7:0] mux_payload_data;
+logic mux_payload_valid;
+logic mux_payload_ready; //eth_tx's payload_ready
+ 
+assign mux_dst_mac = tx_is_arp ? arp_reply_dst_mac : rep_dst_mac; //high - arp path, low - icmp/ip
+assign mux_ether_type = tx_is_arp ? 16'h0806 : 16'h0800;
+assign mux_payload_data = tx_is_arp ? arp_payload_data : iptx_data;
+assign mux_payload_valid = tx_is_arp ? arp_payload_valid : iptx_valid;
+ 
+assign iptx_ready = tx_is_arp ? 1'b0 : mux_payload_ready;
+assign arp_payload_ready = tx_is_arp ? mux_payload_ready : 1'b0;
+
 logic [15:0] icmp_checksum_tx;
 
 always_ff @(posedge rx_clk) begin
@@ -210,19 +234,29 @@ always_ff @(posedge tx_clk) begin
         icmp_tx_start <= 0;
         ip_tx_start <= 0;
         eth_tx_start <= 0;
+        arp_start <= 0;
+        tx_is_arp <= 0;
     end else begin
         icmp_tx_start <= 0;
+        arp_start <= 0;
         ip_tx_start <= 0;
         eth_tx_start <= 0;
  
         unique case (state)
-            idle: if (fifo_valid_tx) begin //if payload there
-                icmp_tx_start <= 1;
-                ip_tx_start <= 1;
-                eth_tx_start <= 1;
-                state <= tx_wait;
-//                $display("TOP: TX fired t=%0t", $time);
-            end
+    idle: begin
+        if (arp_pending) begin
+            arp_start <= 1;
+            eth_tx_start <= 1;
+            tx_is_arp <= 1;
+            state <= tx_wait;
+        end else if (fifo_valid_tx) begin
+            icmp_tx_start <= 1;
+            ip_tx_start <= 1;
+            eth_tx_start <= 1;
+            tx_is_arp <= 0;
+            state <= tx_wait;
+        end
+    end
  
             tx_wait: begin 
                 if (eth_tx_done) state <= idle;
@@ -353,12 +387,12 @@ ip_tx u_ip_tx (
 eth_tx u_eth_tx (
     .tx_clk(tx_clk),
     .rst(rst),
-    .dst_mac(rep_dst_mac),
-    .ether_type(16'h0800),
-    .payload_data(iptx_data),
-    .payload_valid(iptx_valid),
+    .dst_mac(mux_dst_mac), //mux
+    .ether_type(mux_ether_type), //mux
+    .payload_data(mux_payload_data),
+    .payload_valid(mux_payload_valid),
     .start(eth_tx_start),
-    .payload_ready(iptx_ready),
+    .payload_ready(mux_payload_ready),
     .done(eth_tx_done),
     .txd(ethtx_data),
     .tx_valid(ethtx_valid),
@@ -373,6 +407,28 @@ mii_tx u_mii_tx (
     .ready(ethtx_ready),
     .txd(txd),
     .tx_en(tx_en)
+);
+
+arp_handler #(
+    .MY_IP(IP),
+    .MY_MAC(MAC)
+) u_arp_handler (
+    .rx_clk(rx_clk),
+    .tx_clk(tx_clk),
+    .rst(rst),
+    .eth_ether_type(eth_ether_type),
+    .eth_header_valid(eth_header_valid),
+    .eth_payload_data(eth_payload_data),
+    .eth_payload_valid(eth_payload_valid),
+    .eth_frame_done(eth_frame_done),
+    .eth_error(eth_error),
+    .reply_dst_mac(arp_reply_dst_mac),
+    .pending(arp_pending),
+    .start(arp_start),
+    .done(arp_done),
+    .payload_data(arp_payload_data),
+    .payload_valid(arp_payload_valid),
+    .payload_ready(arp_payload_ready)
 );
         
 endmodule
