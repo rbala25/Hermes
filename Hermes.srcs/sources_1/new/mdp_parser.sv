@@ -212,8 +212,8 @@ always_ff @(posedge clk) begin
                                     state <= idle;
                                     active <= 0; //end
                                     mdp_done <= 1;
-                                end else
-                                    state <= size; //next sbe
+                                end 
+//                              else state <= size; //next sbe
                             end else begin
                                 state <= skip;
                                 skip_remaining <= msg_body_remaining - 16'd3;
@@ -263,11 +263,44 @@ always_ff @(posedge clk) begin
                 
                 //t38
                 root_38: begin
-                
+                    cnt <= cnt + 1;
+                    if (cnt >= 8 && cnt <= 11) //skip most fields (53 bytes total)
+                        t38_sec_id <= {udp_payload, t38_sec_id[31:8]};
+                    if (cnt == root_blk_len[7:0] - 1) begin
+                        cnt <= 0;
+                        msg_body_remaining <= msg_body_remaining - root_blk_len;
+                        if (t38_sec_id != sec_id) begin //skip rest
+                            state <= skip;
+                            skip_remaining <= msg_body_remaining - root_blk_len;
+                        end else
+                            state <= dimensions_38;
+                    end
                 end
                 
                 dimensions_38: begin
-                
+                    cnt <= cnt + 1;
+                    if (cnt == 0 || cnt == 1)
+                        entry_blk_len <= {udp_payload, entry_blk_len[15:8]};
+                    if (cnt == 2) begin
+                        cnt <= 0;
+                        msg_body_remaining <= msg_body_remaining - 16'd3;
+                        if (udp_payload == 0) begin
+                            if (msg_body_remaining == 3) begin
+                                if (udp_payload_done) begin
+                                    state <= idle; 
+                                    active <= 0; 
+                                    mdp_done <= 1;
+                                end else
+                                    state <= size;
+                            end else begin
+                                state <= skip;
+                                skip_remaining <= msg_body_remaining - 16'd3;
+                            end
+                        end else begin
+                            entries_left <= udp_payload;
+                            state <= entry_38;
+                        end
+                    end
                 end
                 
                 entry_38: begin
