@@ -85,7 +85,7 @@ always_ff @(posedge clk) begin
         state <= idle;
         active <= 0;
         cnt <= 0;
-        entries_left <= 0;
+        entries_left <= 0; //dimensions tells us entries per sbe
         entry_blk_len <= 0;
         msg_size <= 0;
         root_blk_len <= 0;
@@ -151,22 +151,78 @@ always_ff @(posedge clk) begin
                     end
                 end
                 
+                //sbe
                 size: begin
-                
-                
+                    msg_size <= {udp_payload, msg_size[15:8]};
+                    cnt <= cnt + 1;
+                    if (cnt == 1) begin
+                        cnt <= 0;
+                        state <= hdr;
+                    end
                 end
                 
                 hdr: begin
-                
+                    cnt <= cnt + 1;
+                    if (cnt == 0 || cnt == 1)
+                        root_blk_len <= {udp_payload, root_blk_len[15:8]};
+                    if (cnt == 2 || cnt == 3)
+                        template_id <= {udp_payload, template_id[15:8]};
+                    //skip bytes 4-5 schema id
+                    if (cnt == 7) begin //skip byte 7 (version)
+                        cnt <= 0;
+                        msg_body_remaining <= msg_size - 16'd10;
+                        case (template_id)
+                            16'd46: begin
+                                is_snapshot <= 0;
+                                state <= root_46;
+                            end
+                            16'd38: begin
+                                is_snapshot <= 1;
+                                state <= root_38;
+                            end
+                            default: begin
+                                state <= skip;
+                                skip_remaining <= msg_size - 16'd10;
+                            end
+                        endcase
+                    end
                 end
             
                 //t46
                 root_46: begin
-                
+                    cnt <= cnt + 1;
+                    if (cnt == root_blk_len[7:0] - 1) begin //ignoring contents, just counting
+                        cnt <= 0;
+                        msg_body_remaining <= msg_body_remaining - root_blk_len;
+                        state <= dimensions_46;
+                    end
                 end
                 
                 dimensions_46: begin
-                
+                    cnt <= cnt + 1;
+                    if (cnt == 0 || cnt == 1) //how big is each entry
+                        entry_blk_len <= {udp_payload, entry_blk_len[15:8]};
+                    if (cnt == 2) begin
+                        cnt <= 0;
+                        msg_body_remaining <= msg_body_remaining - 16'd3; 
+                        if (udp_payload == 0) begin
+                            //no entries
+                            if (msg_body_remaining == 3) begin
+                                if (udp_payload_done) begin
+                                    state <= idle;
+                                    active <= 0; //end
+                                    mdp_done <= 1;
+                                end else
+                                    state <= size; //next sbe
+                            end else begin
+                                state <= skip;
+                                skip_remaining <= msg_body_remaining - 16'd3;
+                            end
+                        end else begin
+                            entries_left <= udp_payload; //num of entries
+                            state <= entry_46;
+                        end
+                    end
                 end
                 
                 entry_46: begin
