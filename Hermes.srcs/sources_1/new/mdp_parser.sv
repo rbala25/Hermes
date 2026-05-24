@@ -22,7 +22,7 @@
 
 module mdp_parser #(
     parameter logic [15:0] port = 16'd14310,
-    parameter logic [31:0] sec_id = 32'd0 //imaginary
+    parameter logic [31:0] sec_id = 32'd0 //arbitrary
 )(
     input logic clk,
     input logic rst,
@@ -58,11 +58,12 @@ typedef enum logic [3:0] {
     size,
     hdr,
     root_46,
-    dimensions_46,
+//    dimensions_46,
     entry_46,
     root_38,
-    dimensions_38,
+//    dimensions_38,
     entry_38,
+    dimensions,
     skip
 } state_t;
 
@@ -194,35 +195,35 @@ always_ff @(posedge clk) begin
                     if (cnt == root_blk_len[7:0] - 1) begin //ignoring contents, just counting
                         cnt <= 0;
                         msg_body_remaining <= msg_body_remaining - root_blk_len;
-                        state <= dimensions_46;
+                        state <= dimensions;
                     end
                 end
                 
-                dimensions_46: begin
-                    cnt <= cnt + 1;
-                    if (cnt == 0 || cnt == 1) //how big is each entry
-                        entry_blk_len <= {udp_payload, entry_blk_len[15:8]};
-                    if (cnt == 2) begin
-                        cnt <= 0;
-                        msg_body_remaining <= msg_body_remaining - 16'd3; 
-                        if (udp_payload == 0) begin
-                            //no entries
-                            if (msg_body_remaining == 3) begin
-                                if (udp_payload_done) begin
-                                    state <= idle;
-                                    active <= 0; //end
-                                    mdp_done <= 1;
-                                end 
-//                              else state <= size; //next sbe
-                            end else begin
-                                state <= skip;
-                                skip_remaining <= msg_body_remaining - 16'd3;
-                            end
-                        end else begin
-                            entries_left <= udp_payload; //num of entries
-                            state <= entry_46;
-                        end
-                    end
+//                dimensions_46: begin
+//                    cnt <= cnt + 1;
+//                    if (cnt == 0 || cnt == 1) //how big is each entry
+//                        entry_blk_len <= {udp_payload, entry_blk_len[15:8]};
+//                    if (cnt == 2) begin
+//                        cnt <= 0;
+//                        msg_body_remaining <= msg_body_remaining - 16'd3; 
+//                        if (udp_payload == 0) begin
+//                            //no entries
+//                            if (msg_body_remaining == 3) begin
+//                                if (udp_payload_done) begin
+//                                    state <= idle;
+//                                    active <= 0; //end
+//                                    mdp_done <= 1;
+//                                end 
+////                              else state <= size; //next sbe
+//                            end else begin
+//                                state <= skip;
+//                                skip_remaining <= msg_body_remaining - 16'd3;
+//                            end
+//                        end else begin
+//                            entries_left <= udp_payload; //num of entries
+//                            state <= entry_46;
+//                        end
+//                    end
                 end
                 
                 entry_46: begin
@@ -273,34 +274,34 @@ always_ff @(posedge clk) begin
                             state <= skip;
                             skip_remaining <= msg_body_remaining - root_blk_len;
                         end else
-                            state <= dimensions_38;
+                            state <= dimensions;
                     end
                 end
                 
-                dimensions_38: begin //technically same as dimensions_46 aside from next state
-                    cnt <= cnt + 1;
-                    if (cnt == 0 || cnt == 1)
-                        entry_blk_len <= {udp_payload, entry_blk_len[15:8]};
-                    if (cnt == 2) begin
-                        cnt <= 0;
-                        msg_body_remaining <= msg_body_remaining - 16'd3;
-                        if (udp_payload == 0) begin
-                            if (msg_body_remaining == 3) begin
-                                if (udp_payload_done) begin
-                                    state <= idle; 
-                                    active <= 0; 
-                                    mdp_done <= 1;
-                                end 
-//                                else state <= size;
-                            end else begin
-                                state <= skip;
-                                skip_remaining <= msg_body_remaining - 16'd3;
-                            end
-                        end else begin
-                            entries_left <= udp_payload;
-                            state <= entry_38;
-                        end
-                    end
+//                dimensions_38: begin //technically same as dimensions_46 aside from next state
+//                    cnt <= cnt + 1;
+//                    if (cnt == 0 || cnt == 1)
+//                        entry_blk_len <= {udp_payload, entry_blk_len[15:8]};
+//                    if (cnt == 2) begin
+//                        cnt <= 0;
+//                        msg_body_remaining <= msg_body_remaining - 16'd3;
+//                        if (udp_payload == 0) begin
+//                            if (msg_body_remaining == 3) begin
+//                                if (udp_payload_done) begin
+//                                    state <= idle; 
+//                                    active <= 0; 
+//                                    mdp_done <= 1;
+//                                end 
+////                                else state <= size;
+//                            end else begin
+//                                state <= skip;
+//                                skip_remaining <= msg_body_remaining - 16'd3;
+//                            end
+//                        end else begin
+//                            entries_left <= udp_payload;
+//                            state <= entry_38;
+//                        end
+//                    end
                 end
                 
                 entry_38: begin
@@ -333,6 +334,28 @@ always_ff @(posedge clk) begin
                                 state <= skip;
                                 skip_remaining <= msg_body_remaining - entry_blk_len;
                             end
+                        end
+                    end
+                end
+                
+                //dim
+                dimensions: begin
+                    cnt <= cnt + 1;
+                    if (cnt == 0 || cnt == 1)
+                        entry_blk_len <= {udp_payload, entry_blk_len[15:8]};
+                    if (cnt == 2) begin
+                        cnt <= 0;
+                        msg_body_remaining <= msg_body_remaining - 16'd3;
+                        if (udp_payload == 0) begin
+                            if (udp_payload_done) begin
+                                state <= idle; 
+                                active <= 0; 
+                                mdp_done <= 1;
+                            end else
+                                state <= size;
+                        end else begin
+                            entries_left <= udp_payload;
+                            state <= (template_id == 16'd46) ? entry_46 : entry_38;
                         end
                     end
                 end
