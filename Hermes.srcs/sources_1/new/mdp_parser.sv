@@ -78,7 +78,7 @@ logic [15:0] template_id;
 logic [15:0] msg_body_remaining;
 logic [15:0] skip_remaining;
 logic [31:0] t38_sec_id;
-logic cur_sec_id;
+logic [31:0] cur_sec_id;
 
 always_ff @(posedge clk) begin
     if (rst) begin
@@ -226,7 +226,39 @@ always_ff @(posedge clk) begin
                 end
                 
                 entry_46: begin
-                
+                    cnt <= cnt + 1;
+                    if (cnt < 8) //price9 mantissa
+                        entry_price <= {udp_payload, entry_price[63:8]};
+                    else if (cnt < 12) //num of contracts at this price
+                        entry_size <= {udp_payload, entry_size[31:8]};
+                    else if (cnt < 16)
+                        cur_sec_id <= {udp_payload, cur_sec_id[31:8]};
+                    else if (cnt == 24) 
+                        entry_price_level <= udp_payload;
+                    else if (cnt == 25) //new change delete
+                        entry_update_action <= udp_payload;
+                    else if (cnt == 26) //bid or ask
+                        entry_type <= udp_payload;
+                        
+                    if (cnt == entry_blk_len[7:0] - 1) begin
+                        cnt <= 0;
+                        entries_left <= entries_left - 1;
+                        msg_body_remaining <= msg_body_remaining - entry_blk_len;
+                        if (cur_sec_id == sec_id) entry_valid <= 1;
+                        if (entries_left == 1) begin //else stay in entry state
+                            if (msg_body_remaining == entry_blk_len) begin
+                                if (udp_payload_done) begin
+                                    state <= idle; 
+                                    active <= 0; 
+                                    mdp_done <= 1;
+                                end else
+                                    state <= size;
+                            end else begin
+                                state <= skip;
+                                skip_remaining <= msg_body_remaining - entry_blk_len;
+                            end
+                        end
+                    end
                 end
                 
                 //t38
