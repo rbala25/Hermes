@@ -150,7 +150,47 @@ always_ff @(posedge clk) begin
                             state <= size;
                     end
                 end
+                
+                size: begin
+                
+                
+                end
+                
+                hdr: begin
+                
+                end
             
+                //t46
+                root_46: begin
+                
+                end
+                
+                dimensions_46: begin
+                
+                end
+                
+                entry_46: begin
+                
+                end
+                
+                //t38
+                root_38: begin
+                
+                end
+                
+                dimensions_38: begin
+                
+                end
+                
+                entry_38: begin
+                
+                end
+                
+                skip: begin
+                
+                end
+                
+                default: state <= idle;
             endcase
         end
     end
