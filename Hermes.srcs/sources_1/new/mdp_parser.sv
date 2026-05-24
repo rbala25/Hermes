@@ -277,7 +277,7 @@ always_ff @(posedge clk) begin
                     end
                 end
                 
-                dimensions_38: begin
+                dimensions_38: begin //technically same as dimensions_46 aside from next state
                     cnt <= cnt + 1;
                     if (cnt == 0 || cnt == 1)
                         entry_blk_len <= {udp_payload, entry_blk_len[15:8]};
@@ -290,8 +290,8 @@ always_ff @(posedge clk) begin
                                     state <= idle; 
                                     active <= 0; 
                                     mdp_done <= 1;
-                                end else
-                                    state <= size;
+                                end 
+//                                else state <= size;
                             end else begin
                                 state <= skip;
                                 skip_remaining <= msg_body_remaining - 16'd3;
@@ -304,11 +304,51 @@ always_ff @(posedge clk) begin
                 end
                 
                 entry_38: begin
-                
+                    cnt <= cnt + 1;
+                    if (cnt <= 7) //entry price
+                        entry_price <= {udp_payload, entry_price[63:8]};
+                    else if (cnt <= 11) //num of contracts  
+                        entry_size <= {udp_payload, entry_size[31:8]};
+                    // (skip num orders)
+                    else if (cnt == 16) // price level
+                        entry_price_level <= udp_payload;
+                    else if (cnt == 21) //entry type (bid or ask)
+                        entry_type <= udp_payload;
+
+                    if (cnt == entry_blk_len[7:0] - 1) begin
+                        cnt <= 0;
+                        entry_update_action <= 8'h00; // snapshot always New
+                        entry_valid <= 1;
+                        entries_left <= entries_left - 1;
+                        msg_body_remaining <= msg_body_remaining - entry_blk_len;
+                        if (entries_left == 1) begin
+                            if (msg_body_remaining == entry_blk_len) begin
+                                if (udp_payload_done) begin
+                                    state <= idle; 
+                                    active <= 0;
+                                    mdp_done <= 1;
+                                end else
+                                    state <= size;
+                            end else begin
+                                state <= skip;
+                                skip_remaining <= msg_body_remaining - entry_blk_len;
+                            end
+                        end
+                    end
                 end
                 
-                skip: begin
-                
+                skip: begin //skip current sbe
+                    skip_remaining <= skip_remaining - 1;
+                    if (skip_remaining == 1) begin
+                        if (udp_payload_done) begin
+                            state <= idle; 
+                            active <= 0; 
+                            mdp_done <= 1;
+                        end else begin
+                            state <= size;
+                            cnt <= 0;
+                        end
+                    end
                 end
                 
                 default: state <= idle;
