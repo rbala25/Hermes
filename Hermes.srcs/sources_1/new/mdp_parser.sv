@@ -131,7 +131,7 @@ always_ff @(posedge clk) begin
                 seq: begin
                     mdp_seq_num <= {udp_payload, mdp_seq_num[31:8]};
                     cnt <= cnt + 1;
-                    if (cnt >= 3) begin
+                    if (cnt == 3) begin
                         cnt <= 0;
                         state <= mdp_time;
                     end
@@ -224,7 +224,7 @@ always_ff @(posedge clk) begin
 //                            state <= entry_46;
 //                        end
 //                    end
-                end
+//                end
                 
                 entry_46: begin
                     cnt <= cnt + 1;
@@ -302,7 +302,7 @@ always_ff @(posedge clk) begin
 //                            state <= entry_38;
 //                        end
 //                    end
-                end
+//                end
                 
                 entry_38: begin
                     cnt <= cnt + 1;
