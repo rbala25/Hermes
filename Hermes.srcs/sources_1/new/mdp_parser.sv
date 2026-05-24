@@ -48,4 +48,21 @@ module mdp_parser #(
     output logic mdp_done, //all SBEs done
     output logic mdp_error
 );
+
+typedef enum logic [3:0] {
+    idle,
+    seq,
+    mdp_time,
+    size,
+    hdr,
+    root_46,
+    dimensions,
+    entry,
+    root_38,
+    dimensions_38,
+    entry_38,
+    skip
+} state_t;
+
+
 endmodule
