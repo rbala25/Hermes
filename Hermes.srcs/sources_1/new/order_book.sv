@@ -46,9 +46,7 @@ module order_book(
     output logic [31:0] rd_size,
  
     output logic book_valid, //status indicator
-    output logic gap_detected,
- 
-    output logic [1:0] book_state_dbg //for ila
+    output logic gap_detected
     );
     
     typedef enum logic [1:0] {
@@ -64,9 +62,50 @@ module order_book(
     localparam logic [7:0] ACT_CHANGE = 8'd1;
     localparam logic [7:0] ACT_DELETE = 8'd2;
     
-    logic [63:0] bid_price [0:9]; //storage
+    logic [63:0] bid_price [0:9]; //storage, index 0 best
     logic [31:0] bid_size [0:9];
     logic [63:0] ask_price [0:9];
     logic [31:0] ask_size [0:9];
     
+    logic [31:0] expected_seq;
+    logic seq_init; //flag for init
+    
+    logic snap_bid_cleared; //to ensure thin markets are not issue
+    logic snap_ask_cleared;
+    
+    logic is_bid_entry;
+    logic [3:0] lvl;
+     
+    assign is_bid_entry = (entry_type == BID_TYPE);
+    assign lvl = entry_price_level[3:0] - 4'd1; //0 index
+    
+    assign best_bid_price = bid_price[0];
+    assign best_bid_size = bid_size[0];
+    assign best_ask_price = ask_price[0];
+    assign best_ask_size = ask_size[0];
+     
+    assign rd_price = rd_side ? ask_price[rd_level] : bid_price[rd_level];
+    assign rd_size = rd_side ? ask_size[rd_level] : bid_size[rd_level];
+     
+    always_ff @(posedge clk) begin
+        if (rst) begin
+            book_state <= wait_s;
+            expected_seq <= '0;
+            seq_init <= 0;
+            snap_bid_cleared <= 0;
+            snap_ask_cleared <= 0;
+            book_valid <= 0;
+            gap_detected <= 0;
+            for (int i = 0; i < 10; i++) begin
+                bid_price[i] <= '0;
+                bid_size[i] <= '0;
+                ask_price[i] <= '0;
+                ask_size[i] <= '0;
+            end
+        end else begin
+        
+        
+        end
+    end
+
 endmodule
