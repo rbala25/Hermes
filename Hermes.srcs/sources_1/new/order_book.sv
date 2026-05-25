@@ -103,7 +103,26 @@ module order_book(
                 ask_size[i] <= '0;
             end
         end else begin
-        
+            if (mdp_pkt_valid) begin
+                if (seq_init && (mdp_seq_num != expected_seq) && (book_state == live)) begin
+                    book_state <= gap;
+                    gap_detected <= 1;
+                end
+                seq_init <= 1;
+                expected_seq <= mdp_seq_num + 32'd1;
+            end
+            
+            //update book
+            //if (entry_valid && (entry_price_level >= 8'd1) && (entry_price_level <= 8'd10)) begin
+            if (entry_valid && (lvl <= 4'd9)) begin
+                if (is_snapshot || (book_state == live)) begin
+                    if(is_snapshot) begin
+                    
+                    end
+                
+                
+                end
+            end
         
         end
     end
