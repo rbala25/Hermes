@@ -108,7 +108,7 @@ logic [63:0] prev_best_bid;
 logic [63:0] prev_best_ask;
 logic fill_requote; //sticky
 logic refresh_pending;
-logic [24:0] refresh_counter;
+logic [24:0] refresh_counter; //using REFRESH_TICKS
 
 logic signed [96:0] skew_product;
 assign skew_product = $signed(net_position) * $signed({1'b0, SKEW_PER_CONTRACT}); //comb
@@ -118,5 +118,48 @@ logic signed [64:0] ask_q_raw;
 assign bid_q_raw = $signed({1'b0, mid_price}) - $signed({1'b0, HALF_SPREAD}) - $signed(skew_product[64:0]); //signed
 assign ask_q_raw = $signed({1'b0, mid_price}) + $signed({1'b0, HALF_SPREAD}) - $signed(skew_product[64:0]);
 
-
+always_ff @(posedge clk) begin
+    if (rst) begin
+        state <= IDLE;
+        rd_level <= '0;
+        rd_side <= 0;
+        vwap_cnt <= '0;
+        sum_bid_weighted <= '0;
+        sum_bid_size <= '0;
+        sum_ask_weighted <= '0;
+        sum_ask_size <= '0;
+        div_P <= '0;
+        div_A_lo <= '0;
+        div_D <= '0;
+        div_Q <= '0;
+        div_cnt <= '0;
+        div_phase <= 0;
+        bid_vwap <= '0;
+        ask_vwap <= '0;
+        mid_price <= '0;
+        net_position <= '0;
+        daily_pnl <= '0;
+        sec_counter <= '0;
+        order_count <= '0;
+        refresh_counter <= '0;
+        prev_best_bid <= '0;
+        prev_best_ask <= '0;
+        fill_requote <= 0;
+        refresh_pending <= 0;
+        bid_price <= '0;
+        bid_size <= '0;
+        ask_price <= '0;
+        ask_size <= '0;
+        quote_valid <= 0;
+        cancel_bid <= 0;
+        cancel_ask <= 0;
+        risk_breach <= 0;
+    end else begin
+        quote_valid <= 0; //defalts
+        cancel_bid <= 0;
+        cancel_ask <= 0;
+    
+    
+    end
+end
 endmodule
