@@ -40,7 +40,7 @@ module order_book(
     output logic [63:0] best_ask_price,
     output logic [31:0] best_ask_size,
  
-    input logic [3:0] rd_level, //drive 1-10
+    input logic [3:0] rd_level, //drive 0-9
     input logic rd_side, //0 buy 1 ask
     output logic [63:0] rd_price,
     output logic [31:0] rd_size,
@@ -154,7 +154,7 @@ always_ff @(posedge clk) begin
                             end
                             default: ;
                         endcase
-                    end else begin //cant just alias an array :(
+                    end else begin //cant just alias an array for writes :(
                         case (entry_update_action)
                             new_o: begin
                                 ask_price[lvl] <= entry_price;
