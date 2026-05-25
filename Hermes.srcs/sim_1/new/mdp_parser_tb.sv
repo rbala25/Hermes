@@ -151,7 +151,7 @@ logic done_seen = 0;
 always @(posedge clk) if (mdp_done) done_seen <= 1;
 
 // capture entries when entry_valid fires
-always @(negedge clk) begin
+always @(posedge clk) begin
     if (entry_valid) begin
         cap_price[entry_count]  = entry_price;
         cap_size[entry_count]   = entry_size;
