@@ -62,4 +62,18 @@ module mm_core #(
 
     output logic risk_breach
 );
+
+typedef enum logic [2:0] {
+    idle,
+    vwap_read,
+    div_init,
+    div_run,
+    mid_calc,
+    quote_calc,
+    risk,
+    emit
+} state_t;
+
+state_t state;
+
 endmodule
