@@ -76,4 +76,47 @@ typedef enum logic [2:0] {
 
 state_t state;
 
+logic [127:0] sum_bid_weighted; //vwap
+logic [63:0] sum_bid_size;
+logic [127:0] sum_ask_weighted;
+logic [63:0] sum_ask_size;
+logic [4:0] vwap_cnt;
+
+logic [64:0] div_P; // partial remainder
+logic [63:0] div_A_lo;
+logic [63:0] div_D;
+logic [63:0] div_Q; //quotient
+logic [5:0] div_cnt;
+logic div_phase; //0 = bid, 1 = ask
+
+logic [64:0] P_trial;
+logic Q_bit;
+assign P_trial = {div_P[63:0], div_A_lo[63]};
+assign Q_bit = (P_trial >= {1'b0, div_D}) ? 1'b1 : 1'b0;
+
+logic [63:0] bid_vwap;
+logic [63:0] ask_vwap;
+logic [63:0] mid_price; //computed prices
+
+logic signed [31:0] net_position; //positive = long, neg = short (signed)
+logic signed [127:0] daily_pnl;
+
+logic [24:0] sec_counter; //goes to clk_freq - 1, resets order_count
+logic [15:0] order_count;
+
+logic [63:0] prev_best_bid;
+logic [63:0] prev_best_ask;
+logic fill_requote; //sticky
+logic refresh_pending;
+logic [24:0] refresh_counter;
+
+logic signed [96:0] skew_product;
+assign skew_product = $signed(net_position) * $signed({1'b0, SKEW_PER_CONTRACT}); //comb
+
+logic signed [64:0] bid_q_raw;
+logic signed [64:0] ask_q_raw;
+assign bid_q_raw = $signed({1'b0, mid_price}) - $signed({1'b0, HALF_SPREAD}) - $signed(skew_product[64:0]); //signed
+assign ask_q_raw = $signed({1'b0, mid_price}) + $signed({1'b0, HALF_SPREAD}) - $signed(skew_product[64:0]);
+
+
 endmodule
