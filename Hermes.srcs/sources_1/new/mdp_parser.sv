@@ -48,7 +48,12 @@ module mdp_parser #(
     output logic is_snapshot,
     output logic entry_valid, //pulses for each entry WITHIN an SBE (can be multiple depending on msg size)
     output logic mdp_done, //all SBEs done
-    output logic mdp_error
+    output logic mdp_error,
+    
+    output logic [63:0] trade_price,
+    output logic [31:0] trade_size,
+    output logic [1:0] trade_aggressor,
+    output logic trade_valid
 );
 
 typedef enum logic [3:0] {
