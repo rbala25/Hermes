@@ -83,7 +83,7 @@ int pidx = 0;
 logic [7:0] pbuf[0:31];
 assign payload_in_valid = (pidx < plen);
 assign payload_in_data = pbuf[pidx];
-always @(posedge tx_clk) begin
+always @(negedge tx_clk) begin
     if (payload_in_ready && (pidx < plen)) pidx = pidx + 1;
 end
 int errors = 0;
