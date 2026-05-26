@@ -312,10 +312,10 @@ always_ff @(posedge clk) begin
                 if (book_valid && !gap_detected) begin
                     cancel_bid <= 1;
                     cancel_ask <= 1; //next layer will need a queue to handle cancel and new quotes on same cyc
-                    if (!risk_breach && bid_price != '0 && ask_price != '0) begin
+                    refresh_counter <= 0; //restart refresh clock
+                    if (!risk_breach && bid_price != 0 && ask_price != 0) begin
                         quote_valid <= 1;
                         order_count <= order_count + 16'd1;
-                        refresh_counter <= 0; //restart refresh clock
                     end
                 end
                 state <= idle;
