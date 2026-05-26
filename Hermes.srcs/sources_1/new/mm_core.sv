@@ -181,10 +181,18 @@ always_ff @(posedge clk) begin
         cancel_bid <= 0;
         cancel_ask <= 0;
         risk_breach <= 0;
+        ofi_accum <= 0;
+    ofi_decay_cnt <= 0;
+    directional_mode <= 0;
+    directional_valid <= 0;
+    directional_side <= 0;
+    directional_price <= 0;
+    directional_size <= 0;
     end else begin
         quote_valid <= 0; //defalts
         cancel_bid <= 0;
         cancel_ask <= 0;
+        directional_valid <= 0;
     
         if (sec_counter == CLK_FREQ[24:0] - 25'd1) begin
             sec_counter <= 0;
@@ -217,6 +225,20 @@ always_ff @(posedge clk) begin
          if (gap_detected) begin
             cancel_bid <= 1;
             cancel_ask <= 1;
+        end
+        
+        if (ofi_decay_cnt == OFI_DECAY_TICKS - 1) begin
+            ofi_decay_cnt <= 0;
+            ofi_accum <= ofi_accum >>> 1;
+        end else begin
+            ofi_decay_cnt <= ofi_decay_cnt + 1;
+        end
+        
+        if (trade_valid) begin
+            if (trade_aggressor == 2'd1)
+                ofi_accum <= ofi_accum + $signed({1'b0, trade_size});
+            else if (trade_aggressor == 2'd2)
+                ofi_accum <= ofi_accum - $signed({1'b0, trade_size});
         end
         
         case (state)
@@ -332,6 +354,7 @@ always_ff @(posedge clk) begin
             risk: begin
                 risk_breach <= (net_position > $signed({1'b0, MAX_POSITION})) || (net_position < -$signed({1'b0, MAX_POSITION})) ||
                     (order_count >= MAX_ORDER_RATE) || ((daily_pnl + unrealized_pnl) < -$signed({64'h0, LOSS_LIMIT})); //limits: pnl, position either side, orders per sec
+                directional_mode <= (ofi_accum > $signed({1'b0, OFI_THRESHOLD})) || (ofi_accum < -$signed({1'b0, OFI_THRESHOLD}));
                 state <= emit;
             end
 
@@ -340,9 +363,16 @@ always_ff @(posedge clk) begin
                     cancel_bid <= 1;
                     cancel_ask <= 1; //next layer will need a queue to handle cancel and new quotes on same cyc
                     refresh_counter <= 0; //restart refresh clock
-                    if (!risk_breach && bid_price != 0 && ask_price != 0) begin
-                        quote_valid <= 1;
-                        order_count <= order_count + 16'd1;
+                    if (!risk_breach) begin
+                        if (directional_mode) begin
+                            directional_valid <= 1;
+                            directional_side <= ofi_accum[63] ? 1'b1 : 1'b0;
+                            directional_price <= ofi_accum[63] ? bid_price : ask_price;
+                            directional_size <= QUOTE_SIZE;
+                        end else if (bid_price != 0 && ask_price != 0) begin
+                            quote_valid <= 1;
+                            order_count <= order_count + 16'd1;
+                        end
                     end
                 end
                 state <= idle;
