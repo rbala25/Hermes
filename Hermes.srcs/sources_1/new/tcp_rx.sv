@@ -21,7 +21,7 @@
 
 
 module tcp_rx(
-    input logic rx_clk,
+        input logic rx_clk,
     input logic rst,
  
     input logic [31:0] src_ip,
@@ -30,6 +30,7 @@ module tcp_rx(
  
     input logic [7:0] data_in, //incoming bytes
     input logic data_in_valid,
+    input logic data_in_last, //one cycle pulse on final byte of TCP segment
     output logic data_in_ready,
  
     output logic [15:0] src_port, //parsed header fields
@@ -50,7 +51,7 @@ module tcp_rx(
     output logic rx_rst,
     output logic csum_error //pulse when checksum fails
     );
-
+ 
 typedef enum logic [2:0] {
     idle, header, csum_check, options, payload_state
 } state_t;
@@ -61,18 +62,19 @@ logic [7:0] hdr [0:19]; //raw header byte capture
 logic [15:0] rx_checksum;
 logic [5:0] header_len; //actual header length in bytes = data_offset * 4
 logic [5:0] options_remaining;
-
+logic [7:0] data_offset_raw; //captured hdr[12] for checksum
+ 
 logic [16:0] csum_fold1;
 logic [15:0] csum_fold2;
-
+ 
 logic [31:0] csum_static;
 assign csum_static = {16'h0, src_ip[31:16]} + {16'h0, src_ip[15:0]} + {16'h0, dst_ip[31:16]} + {16'h0, dst_ip[15:0]} + 32'h0006 + {16'h0, tcp_length}
                    + {16'h0, src_port} + {16'h0, dst_port} + {16'h0, seq_num[31:16]} + {16'h0, seq_num[15:0]} + {16'h0, ack_num[31:16]}
-                   + {16'h0, ack_num[15:0]} + {16'h0, {8'h50, flags}} + {16'h0, window_size} + {16'h0, rx_checksum};
+                   + {16'h0, ack_num[15:0]} + {16'h0, {data_offset_raw, flags}} + {16'h0, window_size} + {16'h0, rx_checksum};
  
 assign csum_fold1 = {1'b0, csum_static[15:0]} + {1'b0, csum_static[31:16]};
 assign csum_fold2 = csum_fold1[15:0] + {15'h0, csum_fold1[16]};
-
+ 
 always_ff @(posedge rx_clk) begin
     if (rst) begin
         state <= idle;
@@ -86,6 +88,7 @@ always_ff @(posedge rx_clk) begin
         rx_checksum <= 0;
         header_len <= 0;
         options_remaining <= 0;
+        data_offset_raw <= 0;
         payload_data <= 0;
         payload_valid <= 0;
         data_in_ready <= 0;
@@ -132,6 +135,7 @@ always_ff @(posedge rx_clk) begin
                         rx_checksum <= {hdr[16], hdr[17]}; //ignore urgent pointer
                         header_len <= {hdr[12][7:4], 2'b00}; //data_offset * 4 gives header length in bytes
                         options_remaining <= {hdr[12][7:4], 2'b00} - 6'd20;
+                        data_offset_raw <= hdr[12];
                         state <= csum_check;
                     end
                 end
@@ -157,7 +161,7 @@ always_ff @(posedge rx_clk) begin
             end
  
             options: begin
-                //discarding all option bytes; tcp_session handles MSS negotiation separately if needed.
+                //discarding all option bytes, tcp_session needs to handle
                 data_in_ready <= 1;
                 if (data_in_valid) begin
                     options_remaining <= options_remaining - 1;
@@ -173,11 +177,12 @@ always_ff @(posedge rx_clk) begin
             payload_state: begin
                 data_in_ready <= payload_ready;
                 payload_valid <= data_in_valid;
-                if (data_in_valid && payload_ready)
+                if (data_in_valid && payload_ready) begin
                     payload_data <= data_in;
-                if (!data_in_valid) begin
-                    payload_valid <= 0;
-                    state <= idle;
+                    if (data_in_last) begin
+                        payload_valid <= 0;
+                        state <= idle;
+                    end
                 end
             end
         endcase
