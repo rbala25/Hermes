@@ -23,62 +23,62 @@
 module tcp_tx(
     input logic tx_clk,
     input logic rst,
-
+ 
     input logic [31:0] src_ip,
     input logic [31:0] dst_ip,
     input logic [15:0] tcp_length, //20 + payload length
-
+ 
     input logic [15:0] src_port, //header fields
     input logic [15:0] dst_port,
     input logic [31:0] ack_num,
     input logic [7:0] flags, //0x02 - syn, 0x10 - ack, 0x18 - ack + psh
     input logic [15:0] window_size,
-
+ 
     input logic [15:0] payload_csum,
-
+ 
     input logic [31:0] init_seq,
     input logic load_seq, //one cycle pulse
-
+ 
     input logic start,
     output logic done,
-
+ 
     input logic [7:0] payload_in_data, //from ilink_tx
     input logic payload_in_valid,
+    input logic payload_in_last, //one cycle pulse on final payload byte
     output logic payload_in_ready,
-
+ 
     output logic [7:0] payload_data, //to ip_tx
     output logic payload_valid,
     input logic payload_ready
     );
     
 logic [31:0] seq_num;
-
+ 
 logic [31:0] csum_static; //protocol for TCP is num 6
 assign csum_static = {16'h0, src_ip[31:16]} + {16'h0, src_ip[15:0]} + {16'h0, dst_ip[31:16]} + {16'h0, dst_ip[15:0]} + 32'h0006 + {16'h0, tcp_length}
                    + {16'h0, src_port} + {16'h0, dst_port} + {16'h0, seq_num[31:16]} + {16'h0, seq_num[15:0]} + {16'h0, ack_num[31:16]}
                    + {16'h0, ack_num[15:0]} + {16'h0, {8'h50, flags}} + {16'h0, window_size};
-//0x5000 = data_offset 5 << 12; urgent ptr and checksum placeholder are zero
-
+ 
 logic [16:0] csum_fold1;
 logic [15:0] csum_fold2;
 logic [16:0] csum_with_payload;
 logic [15:0] csum_prefinal;
 logic [15:0] checksum;
-
+ 
 assign csum_fold1 = {1'b0, csum_static[15:0]} + {1'b0, csum_static[31:16]};
 assign csum_fold2 = csum_fold1[15:0] + {15'h0, csum_fold1[16]};
 assign csum_with_payload = {1'b0, csum_fold2} + {1'b0, payload_csum};
 assign csum_prefinal = csum_with_payload[15:0] + {15'h0, csum_with_payload[16]};
 assign checksum = ~csum_prefinal;
-
+ 
 typedef enum logic [1:0] {
     idle, header, data
 } state_t;
-
+ 
 state_t state;
 logic [4:0] cnt;
 logic [15:0] byte_cnt;
-
+ 
 always_ff @(posedge tx_clk) begin
     if (rst) begin
         state <= idle;
@@ -92,7 +92,7 @@ always_ff @(posedge tx_clk) begin
     end else begin
         payload_in_ready <= 0;
         done <= 0;
-
+ 
         unique case (state)
             idle: begin
                 payload_valid <= 0;
@@ -105,7 +105,7 @@ always_ff @(posedge tx_clk) begin
                     state <= header;
                 end
             end
-
+ 
             header: begin
                 payload_valid <= 1;
                 if (payload_ready) begin
@@ -137,25 +137,24 @@ always_ff @(posedge tx_clk) begin
                     endcase
                 end
             end
-
+ 
             data: begin
                 if (payload_in_valid) payload_valid <= 1;
                 if (payload_ready && payload_in_valid) begin
                     payload_data <= payload_in_data;
                     payload_in_ready <= 1;
                     byte_cnt <= byte_cnt + 1;
-                end
-
-                if (payload_ready && !payload_in_valid) begin
-                    seq_num <= seq_num + {16'h0, byte_cnt} + (flags[1] ? 32'd1 : 32'd0) + (flags[0] ? 32'd1 : 32'd0); //syn flag then fin flag
-                    done <= 1;
-                    payload_valid <= 0;
-                    state <= idle;
+                    if (payload_in_last) begin
+                        seq_num <= seq_num + {16'h0, byte_cnt} + 16'd1 + (flags[1] ? 32'd1 : 32'd0) + (flags[0] ? 32'd1 : 32'd0);
+                        done <= 1;
+                        payload_valid <= 0;
+                        state <= idle;
+                    end
                 end
             end
         endcase
         
-        if (load_seq) seq_num <= init_seq; //load_seq wins over any seq_num update above
+        if (load_seq) seq_num <= init_seq;
     end
 end
 
