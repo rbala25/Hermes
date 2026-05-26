@@ -118,6 +118,9 @@ logic signed [64:0] ask_q_raw;
 assign bid_q_raw = $signed({1'b0, mid_price}) - $signed({1'b0, HALF_SPREAD}) - $signed(skew_product[64:0]); //signed
 assign ask_q_raw = $signed({1'b0, mid_price}) + $signed({1'b0, HALF_SPREAD}) - $signed(skew_product[64:0]);
 
+logic signed [127:0] unrealized_pnl;
+assign unrealized_pnl = $signed(net_position) * $signed({1'b0, mid_price});
+
 always_ff @(posedge clk) begin
     if (rst) begin
         state <= idle;
@@ -179,10 +182,10 @@ always_ff @(posedge clk) begin
             else
                 net_position <= net_position - $signed({1'b0, fill_size});
 
-            if (fill_side == 0)
-                daily_pnl <= daily_pnl + ($signed({1'b0, mid_price}) - $signed({1'b0, fill_price})) * $signed({1'b0, fill_size});
-            else
-                daily_pnl <= daily_pnl + ($signed({1'b0, fill_price}) - $signed({1'b0, mid_price})) * $signed({1'b0, fill_size});
+        if (fill_side == 0)
+            daily_pnl <= daily_pnl - $signed({1'b0, fill_price}) * $signed({1'b0, fill_size});
+        else
+            daily_pnl <= daily_pnl + $signed({1'b0, fill_price}) * $signed({1'b0, fill_size});
 
             fill_requote <= 1;
         end
@@ -304,7 +307,7 @@ always_ff @(posedge clk) begin
 
             risk: begin
                 risk_breach <= (net_position > $signed({1'b0, MAX_POSITION})) || (net_position < -$signed({1'b0, MAX_POSITION})) ||
-                    (order_count >= MAX_ORDER_RATE) || (daily_pnl < -$signed({64'h0, LOSS_LIMIT})); //limits: pnl, position either side, orders per sec
+                    (order_count >= MAX_ORDER_RATE) || ((daily_pnl + unrealized_pnl) < -$signed({64'h0, LOSS_LIMIT})); //limits: pnl, position either side, orders per sec
                 state <= emit;
             end
 
