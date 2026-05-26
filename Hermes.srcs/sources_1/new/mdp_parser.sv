@@ -44,7 +44,7 @@ module mdp_parser #(
     output logic [7:0] entry_price_level, //md price level 1-10
     output logic [7:0] entry_update_action, //0 = new, 1 = change, 2 = delete
     output logic [7:0] entry_type, //0x30=Bid 0x31=Ask
-//    output logic [15:0] entry_template_id, // 46=incremental 38=snapshot
+//    output logic [15:0] entry_template_id, // 46=incremental 52=snapshot
     output logic is_snapshot,
     output logic entry_valid, //pulses for each entry WITHIN an SBE (can be multiple depending on msg size)
     output logic mdp_done, //all SBEs done
@@ -65,13 +65,13 @@ typedef enum logic [3:0] {
     root_46,
 //    dimensions_46,
     entry_46,
-    root_38,
-//    dimensions_38,
-    entry_38,
+    root_52,
+//    dimensions_52,
+    entry_52,
     dimensions,
     skip,
-    root_42,
-    entry_42
+    root_48,
+    entry_48
 } state_t;
 
 state_t state;
@@ -85,7 +85,7 @@ logic [15:0] root_blk_len; //root block size
 logic [15:0] template_id;
 logic [15:0] msg_body_remaining;
 logic [15:0] skip_remaining;
-logic [31:0] t38_sec_id;
+logic [31:0] t52_sec_id;
 logic [31:0] cur_sec_id;
 
 always_ff @(posedge clk) begin
@@ -100,7 +100,7 @@ always_ff @(posedge clk) begin
         template_id <= 0;
         msg_body_remaining <= 0;
         skip_remaining <= 0;
-        t38_sec_id <= 0;
+        t52_sec_id <= 0;
         cur_sec_id <= 0;
         mdp_seq_num <= 0;
         mdp_sending_time <= 0;
@@ -189,13 +189,13 @@ always_ff @(posedge clk) begin
                                 is_snapshot <= 0;
                                 state <= root_46;
                             end
-                            16'd38: begin
+                            16'd52: begin
                                 is_snapshot <= 1;
-                                state <= root_38;
+                                state <= root_52;
                             end
-                            16'd42: begin
+                            16'd48: begin
                                 is_snapshot <= 0;
-                                state <= root_42;
+                                state <= root_48;
                             end
                             default: begin
                                 state <= skip;
@@ -278,15 +278,15 @@ always_ff @(posedge clk) begin
                     end
                 end
                 
-                //t38
-                root_38: begin
+                //t52
+                root_52: begin
                     cnt <= cnt + 1;
                     if (cnt >= 8 && cnt <= 11) //skip most fields (53 bytes total)
-                        t38_sec_id <= {udp_payload, t38_sec_id[31:8]};
+                        t52_sec_id <= {udp_payload, t52_sec_id[31:8]};
                     if (cnt == root_blk_len[7:0] - 1) begin
                         cnt <= 0;
                         msg_body_remaining <= msg_body_remaining - root_blk_len;
-                        if (t38_sec_id != sec_id) begin //skip rest
+                        if (t52_sec_id != sec_id) begin //skip rest
                             state <= skip;
                             skip_remaining <= msg_body_remaining - root_blk_len;
                         end else
@@ -294,7 +294,7 @@ always_ff @(posedge clk) begin
                     end
                 end
                 
-//                dimensions_38: begin //technically same as dimensions_46 aside from next state
+//                dimensions_52: begin //technically same as dimensions_46 aside from next state
 //                    cnt <= cnt + 1;
 //                    if (cnt == 0 || cnt == 1)
 //                        entry_blk_len <= {udp_payload, entry_blk_len[15:8]};
@@ -315,12 +315,12 @@ always_ff @(posedge clk) begin
 //                            end
 //                        end else begin
 //                            entries_left <= udp_payload;
-//                            state <= entry_38;
+//                            state <= entry_52;
 //                        end
 //                    end
 //                end
                 
-                entry_38: begin
+                entry_52: begin
                     cnt <= cnt + 1;
                     if (cnt <= 7) //entry price
                         entry_price <= {udp_payload, entry_price[63:8]};
@@ -371,7 +371,7 @@ always_ff @(posedge clk) begin
                                 state <= size;
                         end else begin
                             entries_left <= udp_payload;
-                            state <= (template_id == 16'd46) ? entry_46 : (template_id == 16'd42) ? entry_42 : entry_38;
+                            state <= (template_id == 16'd46) ? entry_46 : (template_id == 16'd48) ? entry_48 : entry_52;
                         end
                     end
                 end
@@ -390,7 +390,7 @@ always_ff @(posedge clk) begin
                     end
                 end
                 
-                root_42: begin
+                root_48: begin
                     cnt <= cnt + 1;
                     if (cnt == root_blk_len[7:0] - 1) begin
                         cnt <= 0;
@@ -399,7 +399,7 @@ always_ff @(posedge clk) begin
                     end
                 end
                 
-                entry_42: begin
+                entry_48: begin
                     cnt <= cnt + 1;
                     if (cnt < 8)
                         trade_price <= {udp_payload, trade_price[63:8]};
@@ -407,7 +407,7 @@ always_ff @(posedge clk) begin
                         trade_size <= {udp_payload, trade_size[31:8]};
                     else if (cnt < 16)
                         cur_sec_id <= {udp_payload, cur_sec_id[31:8]};
-                    else if (cnt == 28)  //AggressorSide, was incorrectly 16
+                    else if (cnt == 24)
                         trade_aggressor <= udp_payload[1:0];
                     if (cnt == entry_blk_len[7:0] - 1) begin
                         cnt <= 0;
