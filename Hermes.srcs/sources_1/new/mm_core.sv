@@ -121,35 +121,35 @@ assign ask_q_raw = $signed({1'b0, mid_price}) + $signed({1'b0, HALF_SPREAD}) - $
 always_ff @(posedge clk) begin
     if (rst) begin
         state <= idle;
-        rd_level <= '0;
+        rd_level <= 0;
         rd_side <= 0;
-        vwap_cnt <= '0;
-        sum_bid_weighted <= '0;
-        sum_bid_size <= '0;
-        sum_ask_weighted <= '0;
-        sum_ask_size <= '0;
-        div_P <= '0;
-        div_A_lo <= '0;
-        div_D <= '0;
-        div_Q <= '0;
-        div_cnt <= '0;
+        vwap_cnt <= 0;
+        sum_bid_weighted <= 0;
+        sum_bid_size <= 0;
+        sum_ask_weighted <= 0;
+        sum_ask_size <= 0;
+        div_P <= 0;
+        div_A_lo <= 0;
+        div_D <= 0;
+        div_Q <= 0;
+        div_cnt <= 0;
         div_phase <= 0;
-        bid_vwap <= '0;
-        ask_vwap <= '0;
-        mid_price <= '0;
-        net_position <= '0;
-        daily_pnl <= '0;
-        sec_counter <= '0;
-        order_count <= '0;
-        refresh_counter <= '0;
-        prev_best_bid <= '0;
-        prev_best_ask <= '0;
+        bid_vwap <= 0;
+        ask_vwap <= 0;
+        mid_price <= 0;
+        net_position <= 0;
+        daily_pnl <= 0;
+        sec_counter <= 0;
+        order_count <= 0;
+        refresh_counter <= 0;
+        prev_best_bid <= 0;
+        prev_best_ask <= 0;
         fill_requote <= 0;
         refresh_pending <= 0;
-        bid_price <= '0;
-        bid_size <= '0;
-        ask_price <= '0;
-        ask_size <= '0;
+        bid_price <= 0;
+        bid_size <= 0;
+        ask_price <= 0;
+        ask_size <= 0;
         quote_valid <= 0;
         cancel_bid <= 0;
         cancel_ask <= 0;
@@ -167,7 +167,7 @@ always_ff @(posedge clk) begin
         end
         
         if (refresh_counter == REFRESH_TICKS - 25'd1) begin
-            refresh_counter <= '0;
+            refresh_counter <= 0;
             refresh_pending <= 1;
         end else begin
             refresh_counter <= refresh_counter + 25'd1;
@@ -180,13 +180,9 @@ always_ff @(posedge clk) begin
                 net_position <= net_position - $signed({1'b0, fill_size});
 
             if (fill_side == 0)
-                daily_pnl <= daily_pnl
-                    + ($signed({1'b0, mid_price}) - $signed({1'b0, fill_price}))
-                    * $signed({1'b0, fill_size});
+                daily_pnl <= daily_pnl + ($signed({1'b0, mid_price}) - $signed({1'b0, fill_price})) * $signed({1'b0, fill_size});
             else
-                daily_pnl <= daily_pnl
-                    + ($signed({1'b0, fill_price}) - $signed({1'b0, mid_price}))
-                    * $signed({1'b0, fill_size});
+                daily_pnl <= daily_pnl + ($signed({1'b0, fill_price}) - $signed({1'b0, mid_price})) * $signed({1'b0, fill_size});
 
             fill_requote <= 1;
         end
@@ -286,58 +282,40 @@ always_ff @(posedge clk) begin
                 end
             end
 
-            // Simple average of the two VWAP prices. Both are < 2^63
-            // (prices in PRICE9 for realistic futures), so the 65-bit add
-            // never overflows bit 64.
-            mid_calc: begin
+            mid_calc: begin //average
                 mid_price <= ({1'b0, bid_vwap} + {1'b0, ask_vwap}) >> 1;
                 state <= quote_calc;
             end
 
-            // bid_q_raw / ask_q_raw are combinational, updated immediately
-            // when mid_price was registered in MID_CALC. Latch them here.
-            // Sign bit [64] indicates negative price → clamp to 0.
-            // Crossed spread (extreme skew) → zero sizes → EMIT won't fire.
             quote_calc: begin
-                if (!bid_q_raw[64] && !ask_q_raw[64] && (ask_q_raw > bid_q_raw)) begin
+                if (!bid_q_raw[64] && !ask_q_raw[64] && (ask_q_raw > bid_q_raw)) begin //ensure non negatives
                     bid_price <= bid_q_raw[63:0];
                     ask_price <= ask_q_raw[63:0];
                     bid_size <= QUOTE_SIZE;
                     ask_size <= QUOTE_SIZE;
                 end else begin
-                    bid_price <= '0;
-                    ask_price <= '0;
-                    bid_size <= '0;
-                    ask_size <= '0;
+                    bid_price <= 0;
+                    ask_price <= 0;
+                    bid_size <= 0;
+                    ask_size <= 0;
                 end
                 state <= risk;
             end
 
-            // Evaluate all three risk limits and latch risk_breach for EMIT.
-            // Limits:
-            //   1. Absolute position exceeds MAX_POSITION contracts.
-            //   2. Quote refresh rate exceeds MAX_ORDER_RATE per second.
-            //   3. Session PnL (mark-to-mid) fell below -LOSS_LIMIT.
             risk: begin
-                risk_breach <=
-                    (net_position > $signed({1'b0, MAX_POSITION})) ||
-                    (net_position < -$signed({1'b0, MAX_POSITION})) ||
-                    (order_count >= MAX_ORDER_RATE) ||
-                    (daily_pnl < -$signed({64'h0, LOSS_LIMIT}));
+                risk_breach <= (net_position > $signed({1'b0, MAX_POSITION})) || (net_position < -$signed({1'b0, MAX_POSITION})) ||
+                    (order_count >= MAX_ORDER_RATE) || (daily_pnl < -$signed({64'h0, LOSS_LIMIT})); //limits: pnl, position either side, orders per sec
                 state <= emit;
             end
 
-            // Cancel-replace: always cancel before posting.
-            // Layer 8 handles spurious cancels with no live order gracefully.
-            // quote_valid suppressed when risk is breached, book is invalid,
-            // gap is active, or the computed prices are zero/crossed.
             emit: begin
                 if (book_valid && !gap_detected) begin
                     cancel_bid <= 1;
-                    cancel_ask <= 1;
+                    cancel_ask <= 1; //next layer will need a queue to handle cancel and new quotes on same cyc
                     if (!risk_breach && bid_price != '0 && ask_price != '0) begin
                         quote_valid <= 1;
                         order_count <= order_count + 16'd1;
+                        refresh_counter <= 0; //restart refresh clock
                     end
                 end
                 state <= idle;
