@@ -91,17 +91,17 @@ mm_core #(
     .quote_valid, .cancel_bid, .cancel_ask, .risk_breach
 );
 
-localparam int PKT_LEN = 101; //lowkey this is just from mdp_parser_tb
+localparam int PKT_LEN = 102; //lowkey this is just from mdp_parser_tb
 logic [7:0] pkt [0:PKT_LEN-1];
 
 task automatic build_snapshot;
     pkt[0]=8'h01; pkt[1]=8'h00; pkt[2]=8'h00; pkt[3]=8'h00;
-    pkt[4]=8'h01; pkt[5]=8'h00; pkt[6]=8'h00; pkt[7]=8'h00; 
+    pkt[4]=8'h01; pkt[5]=8'h00; pkt[6]=8'h00; pkt[7]=8'h00;
     pkt[8]=8'h00; pkt[9]=8'h00; pkt[10]=8'h00; pkt[11]=8'h00;
-   
-    pkt[12]=8'h59; pkt[13]=8'h00;
-    
-    pkt[14]=8'h0C; pkt[15]=8'h00;
+
+    pkt[12]=8'h5A; pkt[13]=8'h00; 
+
+    pkt[14]=8'h0D; pkt[15]=8'h00;
     pkt[16]=8'h26; pkt[17]=8'h00;
     pkt[18]=8'h09; pkt[19]=8'h00;
     pkt[20]=8'h08; pkt[21]=8'h00;
@@ -109,31 +109,33 @@ task automatic build_snapshot;
     pkt[22]=8'h00; pkt[23]=8'h00; pkt[24]=8'h00; pkt[25]=8'h00;
     pkt[26]=8'h00; pkt[27]=8'h00; pkt[28]=8'h00; pkt[29]=8'h00;
     pkt[30]=8'h39; pkt[31]=8'h30; pkt[32]=8'h00; pkt[33]=8'h00;
-   
-    pkt[34]=8'h20; pkt[35]=8'h00;
-    pkt[36]=8'h02;
+    pkt[34]=8'h00;
 
-    pkt[37]=8'hE8; pkt[38]=8'h03; pkt[39]=8'h00; pkt[40]=8'h00;
-    pkt[41]=8'h00; pkt[42]=8'h00; pkt[43]=8'h00; pkt[44]=8'h00; 
-    pkt[45]=8'h64; pkt[46]=8'h00; pkt[47]=8'h00; pkt[48]=8'h00; 
-    pkt[49]=8'h00; pkt[50]=8'h00; pkt[51]=8'h00; pkt[52]=8'h00; 
-    pkt[53]=8'h01; 
-    pkt[54]=8'h00; pkt[55]=8'h00; pkt[56]=8'h00; pkt[57]=8'h00;
-    pkt[58]=8'h30;               
-    pkt[59]=8'h00; pkt[60]=8'h00; pkt[61]=8'h00; pkt[62]=8'h00;
-    pkt[63]=8'h00; pkt[64]=8'h00; pkt[65]=8'h00; pkt[66]=8'h00;
-    pkt[67]=8'h00; pkt[68]=8'h00;
+    pkt[35]=8'h20; pkt[36]=8'h00;
+    pkt[37]=8'h02;
 
-    pkt[69]=8'hD0; pkt[70]=8'h07; pkt[71]=8'h00; pkt[72]=8'h00; //entry 2
-    pkt[73]=8'h00; pkt[74]=8'h00; pkt[75]=8'h00; pkt[76]=8'h00; 
-    pkt[77]=8'h64; pkt[78]=8'h00; pkt[79]=8'h00; pkt[80]=8'h00; 
-    pkt[81]=8'h00; pkt[82]=8'h00; pkt[83]=8'h00; pkt[84]=8'h00;
-    pkt[85]=8'h01;                                      
-    pkt[86]=8'h00; pkt[87]=8'h00; pkt[88]=8'h00; pkt[89]=8'h00; 
-    pkt[90]=8'h31;                                                
-    pkt[91]=8'h00; pkt[92]=8'h00; pkt[93]=8'h00; pkt[94]=8'h00; 
-    pkt[95]=8'h00; pkt[96]=8'h00; pkt[97]=8'h00; pkt[98]=8'h00;
-    pkt[99]=8'h00; pkt[100]=8'h00;
+    pkt[38]=8'hE8; pkt[39]=8'h03; pkt[40]=8'h00; pkt[41]=8'h00;
+    pkt[42]=8'h00; pkt[43]=8'h00; pkt[44]=8'h00; pkt[45]=8'h00;
+    pkt[46]=8'h64; pkt[47]=8'h00; pkt[48]=8'h00; pkt[49]=8'h00;
+    pkt[50]=8'h00; pkt[51]=8'h00; pkt[52]=8'h00; pkt[53]=8'h00;
+    pkt[54]=8'h01;
+    pkt[55]=8'h00; pkt[56]=8'h00; pkt[57]=8'h00; pkt[58]=8'h00;
+    pkt[59]=8'h30;
+    pkt[60]=8'h00; pkt[61]=8'h00; pkt[62]=8'h00; pkt[63]=8'h00;
+    pkt[64]=8'h00; pkt[65]=8'h00; pkt[66]=8'h00; pkt[67]=8'h00;
+    pkt[68]=8'h00; pkt[69]=8'h00;
+
+    //entry 2
+    pkt[70]=8'hD0; pkt[71]=8'h07; pkt[72]=8'h00; pkt[73]=8'h00;
+    pkt[74]=8'h00; pkt[75]=8'h00; pkt[76]=8'h00; pkt[77]=8'h00;
+    pkt[78]=8'h64; pkt[79]=8'h00; pkt[80]=8'h00; pkt[81]=8'h00;
+    pkt[82]=8'h00; pkt[83]=8'h00; pkt[84]=8'h00; pkt[85]=8'h00;
+    pkt[86]=8'h01;
+    pkt[87]=8'h00; pkt[88]=8'h00; pkt[89]=8'h00; pkt[90]=8'h00;
+    pkt[91]=8'h31;
+    pkt[92]=8'h00; pkt[93]=8'h00; pkt[94]=8'h00; pkt[95]=8'h00;
+    pkt[96]=8'h00; pkt[97]=8'h00; pkt[98]=8'h00; pkt[99]=8'h00;
+    pkt[100]=8'h00; pkt[101]=8'h00;
 endtask
 
 task automatic send_pkt;
