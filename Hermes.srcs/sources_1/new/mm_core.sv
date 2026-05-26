@@ -29,7 +29,10 @@ module mm_core #(
     parameter logic [3:0] VWAP_LEVELS = 4'd3, 
     parameter logic [63:0] SKEW_PER_CONTRACT = 64'd1_000_000_000, //$1.00 per contract
     parameter logic [24:0] REFRESH_TICKS = 25'd1_000_000, //40 ms prevent stale quotes
-    parameter logic [31:0] CLK_FREQ = 32'd25_000_000
+    parameter logic [31:0] CLK_FREQ = 32'd25_000_000,
+    parameter logic [31:0] OFI_DECAY_TICKS = 32'd25_000, //1ms half life
+    parameter logic [63:0] OFI_SCALE = 64'd1_000_000,
+    parameter logic [31:0] OFI_THRESHOLD = 32'd100
 )(
     input logic clk,
     input logic rst,
@@ -60,7 +63,17 @@ module mm_core #(
     output logic cancel_bid, //pulse based
     output logic cancel_ask,
 
-    output logic risk_breach
+    output logic risk_breach,
+    
+    input logic [63:0] trade_price,
+    input logic [31:0] trade_size,
+    input logic [1:0] trade_aggressor,
+    input logic trade_valid,
+    
+    output logic directional_valid,
+    output logic directional_side,
+    output logic [63:0] directional_price,
+    output logic [31:0] directional_size
 );
 
 typedef enum logic [2:0] {
@@ -115,11 +128,22 @@ assign skew_product = $signed(net_position) * $signed({1'b0, SKEW_PER_CONTRACT})
 
 logic signed [64:0] bid_q_raw;
 logic signed [64:0] ask_q_raw;
-assign bid_q_raw = $signed({1'b0, mid_price}) - $signed({1'b0, HALF_SPREAD}) - $signed(skew_product[64:0]); //signed
-assign ask_q_raw = $signed({1'b0, mid_price}) + $signed({1'b0, HALF_SPREAD}) - $signed(skew_product[64:0]);
 
 logic signed [127:0] unrealized_pnl;
 assign unrealized_pnl = $signed(net_position) * $signed({1'b0, mid_price});
+
+logic signed [63:0] ofi_accum;
+logic [31:0] ofi_decay_cnt;
+logic directional_mode;
+
+logic signed [127:0] ofi_offset_full;
+assign ofi_offset_full = $signed(ofi_accum) * $signed({1'b0, OFI_SCALE});
+
+logic signed [64:0] ofi_adjusted_mid;
+assign ofi_adjusted_mid = $signed({1'b0, mid_price}) + ofi_offset_full[64:0];
+
+assign bid_q_raw = ofi_adjusted_mid - $signed({1'b0, HALF_SPREAD}) - $signed(skew_product[64:0]);
+assign ask_q_raw = ofi_adjusted_mid + $signed({1'b0, HALF_SPREAD}) - $signed(skew_product[64:0]);
 
 always_ff @(posedge clk) begin
     if (rst) begin
