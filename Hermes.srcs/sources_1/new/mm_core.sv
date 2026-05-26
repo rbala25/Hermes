@@ -191,11 +191,161 @@ always_ff @(posedge clk) begin
             fill_requote <= 1;
         end
         
-        if (gap_detected) begin
+         if (gap_detected) begin
             cancel_bid <= 1;
             cancel_ask <= 1;
         end
         
+        case (state)
+
+            idle: begin
+                if (book_valid && !gap_detected) begin
+                    if (best_bid_price != prev_best_bid || best_ask_price != prev_best_ask || fill_requote || refresh_pending) begin //only catches best bid/ask changes
+                        sum_bid_weighted <= 0;
+                        sum_bid_size <= 0;
+                        sum_ask_weighted <= 0;
+                        sum_ask_size <= 0;
+                        vwap_cnt <= 0;
+                        prev_best_bid <= best_bid_price;
+                        prev_best_ask <= best_ask_price;
+                        fill_requote <= 0;
+                        refresh_pending <= 0;
+                        rd_level <= 0;
+                        rd_side <= 0;
+                        state <= vwap_read;
+                    end
+                end
+            end
+
+            vwap_read: begin
+                if (vwap_cnt < {1'b0, VWAP_LEVELS}) begin
+                    sum_bid_weighted <= sum_bid_weighted + 128'(rd_price) * 128'(rd_size);
+                    sum_bid_size <= sum_bid_size + {32'h0, rd_size};
+                end else begin
+                    sum_ask_weighted <= sum_ask_weighted + 128'(rd_price) * 128'(rd_size);
+                    sum_ask_size <= sum_ask_size + {32'h0, rd_size};
+                end
+
+                if (vwap_cnt == (5'(VWAP_LEVELS) << 1) - 5'd1) begin
+                    state <= div_init;
+                    div_phase <= 0;
+                end else begin
+                    vwap_cnt <= vwap_cnt + 5'd1;
+                    if (vwap_cnt == 5'(VWAP_LEVELS) - 5'd1) begin
+                        rd_level <= 0; // switch to ask next cyc
+                        rd_side <= 1;
+                    end else begin
+                        rd_level <= rd_level + 4'd1; 
+                    end
+                end
+            end
+
+            div_init: begin //binary div
+                if (div_phase == 0) begin
+                    if (sum_bid_size == 0) begin //zero size top 3
+                        bid_vwap <= best_bid_price;
+                        div_phase <= 1; //back to div init for ask
+                    end else begin
+                        div_P <= {1'b0, sum_bid_weighted[127:64]}; //running remainder
+                        div_A_lo <= sum_bid_weighted[63:0]; 
+                        div_D <= sum_bid_size;
+                        div_Q <= 0;
+                        div_cnt <= 0;
+                        state <= div_run;
+                    end
+                end else begin
+                    if (sum_ask_size == 0) begin
+                        ask_vwap <= best_ask_price;
+                        state <= mid_calc;
+                    end else begin
+                        div_P <= {1'b0, sum_ask_weighted[127:64]};
+                        div_A_lo <= sum_ask_weighted[63:0];
+                        div_D <= sum_ask_size;
+                        div_Q <= '0;
+                        div_cnt <= '0;
+                        state <= div_run;
+                    end
+                end
+            end
+
+            div_run: begin
+                div_P <= Q_bit ? P_trial - {1'b0, div_D} : P_trial; //q bit 1 when > divisor
+                div_Q <= {div_Q[62:0], Q_bit};
+                div_A_lo <= {div_A_lo[62:0], 1'b0};
+                div_cnt <= div_cnt + 6'd1;
+
+                if (div_cnt == 6'd63) begin
+                    if (div_phase == 0) begin
+                        bid_vwap <= {div_Q[62:0], Q_bit};
+                        div_phase <= 1;
+                        state <= div_init;
+                    end else begin
+                        ask_vwap <= {div_Q[62:0], Q_bit};
+                        state <= mid_calc;
+                    end
+                end
+            end
+
+            // Simple average of the two VWAP prices. Both are < 2^63
+            // (prices in PRICE9 for realistic futures), so the 65-bit add
+            // never overflows bit 64.
+            mid_calc: begin
+                mid_price <= ({1'b0, bid_vwap} + {1'b0, ask_vwap}) >> 1;
+                state <= quote_calc;
+            end
+
+            // bid_q_raw / ask_q_raw are combinational, updated immediately
+            // when mid_price was registered in MID_CALC. Latch them here.
+            // Sign bit [64] indicates negative price → clamp to 0.
+            // Crossed spread (extreme skew) → zero sizes → EMIT won't fire.
+            quote_calc: begin
+                if (!bid_q_raw[64] && !ask_q_raw[64] && (ask_q_raw > bid_q_raw)) begin
+                    bid_price <= bid_q_raw[63:0];
+                    ask_price <= ask_q_raw[63:0];
+                    bid_size <= QUOTE_SIZE;
+                    ask_size <= QUOTE_SIZE;
+                end else begin
+                    bid_price <= '0;
+                    ask_price <= '0;
+                    bid_size <= '0;
+                    ask_size <= '0;
+                end
+                state <= risk;
+            end
+
+            // Evaluate all three risk limits and latch risk_breach for EMIT.
+            // Limits:
+            //   1. Absolute position exceeds MAX_POSITION contracts.
+            //   2. Quote refresh rate exceeds MAX_ORDER_RATE per second.
+            //   3. Session PnL (mark-to-mid) fell below -LOSS_LIMIT.
+            risk: begin
+                risk_breach <=
+                    (net_position > $signed({1'b0, MAX_POSITION})) ||
+                    (net_position < -$signed({1'b0, MAX_POSITION})) ||
+                    (order_count >= MAX_ORDER_RATE) ||
+                    (daily_pnl < -$signed({64'h0, LOSS_LIMIT}));
+                state <= emit;
+            end
+
+            // Cancel-replace: always cancel before posting.
+            // Layer 8 handles spurious cancels with no live order gracefully.
+            // quote_valid suppressed when risk is breached, book is invalid,
+            // gap is active, or the computed prices are zero/crossed.
+            emit: begin
+                if (book_valid && !gap_detected) begin
+                    cancel_bid <= 1;
+                    cancel_ask <= 1;
+                    if (!risk_breach && bid_price != '0 && ask_price != '0) begin
+                        quote_valid <= 1;
+                        order_count <= order_count + 16'd1;
+                    end
+                end
+                state <= idle;
+            end
+
+            default: state <= idle;
+
+        endcase
     end
 end
 endmodule
