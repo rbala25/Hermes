@@ -120,7 +120,7 @@ assign ask_q_raw = $signed({1'b0, mid_price}) + $signed({1'b0, HALF_SPREAD}) - $
 
 always_ff @(posedge clk) begin
     if (rst) begin
-        state <= IDLE;
+        state <= idle;
         rd_level <= '0;
         rd_side <= 0;
         vwap_cnt <= '0;
@@ -159,7 +159,43 @@ always_ff @(posedge clk) begin
         cancel_bid <= 0;
         cancel_ask <= 0;
     
-    
+        if (sec_counter == CLK_FREQ[24:0] - 25'd1) begin
+            sec_counter <= 0;
+            order_count <= 0;
+        end else begin
+            sec_counter <= sec_counter + 25'd1;
+        end
+        
+        if (refresh_counter == REFRESH_TICKS - 25'd1) begin
+            refresh_counter <= '0;
+            refresh_pending <= 1;
+        end else begin
+            refresh_counter <= refresh_counter + 25'd1;
+        end
+        
+        if (fill_valid) begin
+            if (fill_side == 0)
+                net_position <= net_position + $signed({1'b0, fill_size});
+            else
+                net_position <= net_position - $signed({1'b0, fill_size});
+
+            if (fill_side == 0)
+                daily_pnl <= daily_pnl
+                    + ($signed({1'b0, mid_price}) - $signed({1'b0, fill_price}))
+                    * $signed({1'b0, fill_size});
+            else
+                daily_pnl <= daily_pnl
+                    + ($signed({1'b0, fill_price}) - $signed({1'b0, mid_price}))
+                    * $signed({1'b0, fill_size});
+
+            fill_requote <= 1;
+        end
+        
+        if (gap_detected) begin
+            cancel_bid <= 1;
+            cancel_ask <= 1;
+        end
+        
     end
 end
 endmodule
