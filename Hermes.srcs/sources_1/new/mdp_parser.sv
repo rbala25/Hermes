@@ -371,7 +371,7 @@ always_ff @(posedge clk) begin
                                 state <= size;
                         end else begin
                             entries_left <= udp_payload;
-                            state <= (template_id == 16'd46) ? entry_46 : entry_38;
+                            state <= (template_id == 16'd46) ? entry_46 : (template_id == 16'd42) ? entry_42 : entry_38;
                         end
                     end
                 end
@@ -386,6 +386,46 @@ always_ff @(posedge clk) begin
                         end else begin
                             state <= size;
                             cnt <= 0;
+                        end
+                    end
+                end
+                
+                root_42: begin
+                    cnt <= cnt + 1;
+                    if (cnt == root_blk_len[7:0] - 1) begin
+                        cnt <= 0;
+                        msg_body_remaining <= msg_body_remaining - root_blk_len;
+                        state <= dimensions;
+                    end
+                end
+                
+                entry_42: begin
+                    cnt <= cnt + 1;
+                    if (cnt < 8)
+                        trade_price <= {udp_payload, trade_price[63:8]};
+                    else if (cnt < 12)
+                        trade_size <= {udp_payload, trade_size[31:8]};
+                    else if (cnt < 16)
+                        cur_sec_id <= {udp_payload, cur_sec_id[31:8]};
+                    else if (cnt == 28)  //AggressorSide, was incorrectly 16
+                        trade_aggressor <= udp_payload[1:0];
+                    if (cnt == entry_blk_len[7:0] - 1) begin
+                        cnt <= 0;
+                        entries_left <= entries_left - 1;
+                        msg_body_remaining <= msg_body_remaining - entry_blk_len;
+                        if (cur_sec_id == sec_id) trade_valid <= 1;
+                        if (entries_left == 1) begin
+                            if (msg_body_remaining == entry_blk_len) begin
+                                if (udp_payload_done) begin
+                                    state <= idle;
+                                    active <= 0;
+                                    mdp_done <= 1;
+                                end else
+                                    state <= size;
+                            end else begin
+                                state <= skip;
+                                skip_remaining <= msg_body_remaining - entry_blk_len;
+                            end
                         end
                     end
                 end
