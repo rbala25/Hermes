@@ -69,7 +69,9 @@ typedef enum logic [3:0] {
 //    dimensions_38,
     entry_38,
     dimensions,
-    skip
+    skip,
+    root_42,
+    entry_42
 } state_t;
 
 state_t state;
@@ -112,11 +114,16 @@ always_ff @(posedge clk) begin
         entry_valid <= 0;
         mdp_done <= 0;
         mdp_error <= 0;
+        trade_price <= 0;
+        trade_size <= 0;
+        trade_aggressor <= 0;
+        trade_valid <= 0;
     end else begin
         mdp_pkt_valid <= 0;
         entry_valid <= 0;
         mdp_done <= 0;
         mdp_error <= 0;
+        trade_valid <= 0;
         
         if (udp_error) begin
             state <= idle;
@@ -185,6 +192,10 @@ always_ff @(posedge clk) begin
                             16'd38: begin
                                 is_snapshot <= 1;
                                 state <= root_38;
+                            end
+                            16'd42: begin
+                                is_snapshot <= 0;
+                                state <= root_42;
                             end
                             default: begin
                                 state <= skip;
