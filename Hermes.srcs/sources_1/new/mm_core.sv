@@ -31,7 +31,7 @@ module mm_core #(
     parameter logic [24:0] REFRESH_TICKS = 25'd1_000_000, //40 ms prevent stale quotes
     parameter logic [31:0] CLK_FREQ = 32'd25_000_000,
     parameter logic [31:0] OFI_DECAY_TICKS = 32'd25_000, //1ms half life
-    parameter logic [63:0] OFI_SCALE = 64'd1_000_000,
+    parameter logic [63:0] OFI_SCALE = 64'd1_250_000_000, //+100 will shift mid by 12.5 dollars
     parameter logic [31:0] OFI_THRESHOLD = 32'd100
 )(
     input logic clk,
@@ -182,12 +182,12 @@ always_ff @(posedge clk) begin
         cancel_ask <= 0;
         risk_breach <= 0;
         ofi_accum <= 0;
-    ofi_decay_cnt <= 0;
-    directional_mode <= 0;
-    directional_valid <= 0;
-    directional_side <= 0;
-    directional_price <= 0;
-    directional_size <= 0;
+        ofi_decay_cnt <= 0;
+        directional_mode <= 0;
+        directional_valid <= 0;
+        directional_side <= 0;
+        directional_price <= 0;
+        directional_size <= 0;
     end else begin
         quote_valid <= 0; //defalts
         cancel_bid <= 0;
@@ -229,7 +229,7 @@ always_ff @(posedge clk) begin
         
         if (ofi_decay_cnt == OFI_DECAY_TICKS - 1) begin
             ofi_decay_cnt <= 0;
-            ofi_accum <= ofi_accum >>> 1;
+            ofi_accum <= ofi_accum >>> 1; //arithemtic shift to preserve sign
         end else begin
             ofi_decay_cnt <= ofi_decay_cnt + 1;
         end
