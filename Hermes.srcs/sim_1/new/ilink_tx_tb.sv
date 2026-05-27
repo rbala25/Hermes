@@ -39,6 +39,14 @@ logic quote_valid;
 logic [63:0] bid_price, ask_price;
 logic [31:0] bid_size, ask_size;
 
+logic [7:0] prev_data;
+logic prev_last;
+
+always_ff @(posedge clk) begin
+    prev_data <= payload_in_data;
+    prev_last <= payload_in_last;
+end
+
 logic cancel_bid, cancel_ask;
 logic directional_valid, directional_side;
 logic [63:0] directional_price;
@@ -98,14 +106,6 @@ always_ff @(posedge clk) begin
     payload_in_ready <= payload_in_valid;
     tx_grant <= established;
     tx_done <= payload_in_valid && payload_in_last;
-end
-
-logic [7:0] prev_data;
-logic prev_last;
-
-always_ff @(posedge clk) begin
-    prev_data <= payload_in_data;
-    prev_last <= payload_in_last;
 end
 
 logic [7:0] buff [0:255];
