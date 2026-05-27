@@ -253,7 +253,7 @@ end
 
 logic [7:0] next_tx_cnt;
 assign next_tx_cnt = (payload_in_ready && state == s_tx && tx_cnt != msg_len - 8'd1) ? tx_cnt + 8'd1 : tx_cnt;
-assign payload_in_data = msg_buf[next_tx_cnt];
+assign payload_in_data = msg_buf[next_tx_cnt]; //putting bytes on wire
 assign payload_in_last = (state == s_tx) && (next_tx_cnt == msg_len - 8'd1);
  
 assign flags = 8'h18; //always 0x18 (ack and psh) for data
@@ -450,16 +450,30 @@ always_ff @(posedge clk) begin
             end
             
             s_wait_grant: begin
-            
+                if (tx_grant) begin
+                    start <= 1;
+                    tx_cnt <= 0;
+                    payload_in_valid <= 1;
+                    state <= s_tx;
+                end
             end
             
             s_tx: begin
-            
+                if (payload_in_ready) begin //bytes get streamed via combinational logic way above
+                    if (tx_cnt == msg_len - 8'd1) begin
+                        payload_in_valid <= 0;
+                        state <= s_wait_done;
+                    end else begin
+                        tx_cnt <= tx_cnt + 8'd1;
+                    end
+                end
             end
             
             s_wait_done: begin
-            
+                if (tx_done) state <= s_idle; //one cycle for timing
             end
+            
+            default: state <= s_idle;
         endcase
     end
 end
