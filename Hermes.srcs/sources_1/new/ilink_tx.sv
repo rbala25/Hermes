@@ -317,6 +317,43 @@ always_ff @(posedge clk) begin
             neg_pending <= 0; //end tcp session
             est_pending <= 0;
         end
+        
+        if (ilink_established) begin //look at this agaun (IMPORTANT)
+            if (quote_valid) begin
+                lat_bid_price <= bid_price;
+                lat_bid_size <= bid_size;
+                lat_ask_price <= ask_price;
+                lat_ask_size <= ask_size;
+                nos_bid_pending <= 1;
+                nos_ask_pending <= 1;
+            end
+            if (cancel_bid) begin
+                lat_bid_order_id <= bid_order_id;
+                ocr_bid_pending <= 1;
+            end
+            if (cancel_ask) begin
+                lat_ask_order_id <= ask_order_id;
+                ocr_ask_pending <= 1;
+            end
+            if (directional_valid) begin
+                lat_dir_price <= directional_price;
+                lat_dir_size <= directional_size;
+                lat_dir_side <= directional_side;
+                nos_dir_pending <= 1;
+            end
+        end
+        
+        if (!ilink_established) begin
+            hb_cnt <= 0;
+            seq_pending <= 0;
+        end else begin //seq keep alive
+            if (hb_cnt == HB_INTERVAL - 32'd1) begin
+                hb_cnt <= 0;
+                seq_pending <= 1;
+            end else begin
+                hb_cnt <= hb_cnt + 32'd1;
+            end
+        end
     
     end
 end
