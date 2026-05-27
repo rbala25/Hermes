@@ -156,10 +156,10 @@ logic [15:0] csum_final_w;
 assign csum_fold_w = csum_accum[15:0] + csum_accum[31:16];
 assign csum_final_w = csum_fold_w[15:0] + {15'h0, csum_fold_w[16]};
 
-logic [63:0] nos_price_c;
+logic [63:0] nos_price_c; //newordersingle
 logic [31:0] nos_qty_c;
 logic [7:0]  nos_side_c;
-logic [63:0] ocr_oid_c;
+logic [63:0] ocr_oid_c; //order cancel req
 logic [7:0]  ocr_side_c;
 
 assign nos_price_c = (cur_msg == mtype_nos_dir) ? lat_dir_price : (cur_msg == mtype_nos_bid) ? lat_bid_price : lat_ask_price;
@@ -319,7 +319,7 @@ always_ff @(posedge clk) begin
         end
         
         if (ilink_established) begin //look at this agaun (IMPORTANT)
-            if (quote_valid) begin
+            if (quote_valid) begin //latch
                 lat_bid_price <= bid_price;
                 lat_bid_size <= bid_size;
                 lat_ask_price <= ask_price;
@@ -354,7 +354,101 @@ always_ff @(posedge clk) begin
                 hb_cnt <= hb_cnt + 32'd1;
             end
         end
-    
+        
+        unique case (state)
+            s_idle: begin
+                payload_in_valid <= 0; //negotiate > establish > ocr > nos > directional > sequence
+                if (neg_pending) begin
+                    neg_pending <= 0;
+                    cur_msg <= mtype_negotiate;
+                    msg_len <= NEG_LEN;
+                    build_cnt <= 0;
+                    csum_accum <= 0;
+                    state <= s_build;
+                end else if (est_pending) begin
+                    est_pending <= 0;
+                    cur_msg <= mtype_establish;
+                    msg_len <= EST_LEN;
+                    build_cnt <= 0;
+                    csum_accum <= 0; //no increment of seq
+                    state <= s_build;
+                end else if (ocr_bid_pending) begin
+                    ocr_bid_pending <= 0;
+                    cur_msg <= mtype_ocr_bid;
+                    cur_seq <= seq_num;
+                    seq_num <= seq_num + 32'd1;
+                    msg_len <= OCR_LEN;
+                    build_cnt <= 0;
+                    csum_accum <= 0;
+                    state <= s_build;
+                end else if (ocr_ask_pending) begin
+                    ocr_ask_pending <= 0;
+                    cur_msg <= mtype_ocr_ask;
+                    cur_seq <= seq_num;
+                    seq_num <= seq_num + 32'd1;
+                    msg_len <= OCR_LEN;
+                    build_cnt <= 0;
+                    csum_accum <= 0;
+                    state <= s_build;
+                end else if (nos_bid_pending) begin
+                    nos_bid_pending <= 0;
+                    lat_bid_clord_seq <= seq_num;
+                    cur_msg <= mtype_nos_bid;
+                    cur_seq <= seq_num;
+                    seq_num <= seq_num + 32'd1;
+                    msg_len <= NOS_LEN;
+                    build_cnt <= 0;
+                    csum_accum <= 0;
+                    state <= s_build;
+                end else if (nos_ask_pending) begin
+                    nos_ask_pending <= 0;
+                    lat_ask_clord_seq <= seq_num;
+                    cur_msg <= mtype_nos_ask;
+                    cur_seq <= seq_num;
+                    seq_num <= seq_num + 32'd1;
+                    msg_len <= NOS_LEN;
+                    build_cnt <= 0;
+                    csum_accum <= 0;
+                    state <= s_build;
+                end else if (nos_dir_pending) begin
+                    nos_dir_pending <= 0;
+                    cur_msg <= mtype_nos_dir;
+                    cur_seq <= seq_num;
+                    seq_num <= seq_num + 32'd1;
+                    msg_len <= NOS_LEN;
+                    build_cnt <= 0;
+                    csum_accum <= 0;
+                    state <= s_build;
+                end else if (seq_pending) begin
+                    seq_pending <= 0;
+                    cur_msg <= mtype_sequence;
+                    msg_len <= SEQ_LEN;
+                    build_cnt <= 0;
+                    csum_accum <= 0;
+                    state <= s_build;
+                end
+            end
+            
+            s_build: begin
+            
+            end
+            
+            s_csum: begin
+            
+            end
+            
+            s_wait_grant: begin
+            
+            end
+            
+            s_tx: begin
+            
+            end
+            
+            s_wait_done: begin
+            
+            end
+        endcase
     end
 end
 endmodule
