@@ -298,7 +298,25 @@ always_ff @(posedge clk) begin
     end else begin
         start <= 0; 
         
+        established_prev <= established;
+        if (established && !established_prev) begin
+            neg_pending <= 1; //negotiate when tcp established
+            seq_num <= 32'd1;
+            ilink_established <= 0;
+            hb_cnt <= 0;
+        end
         
+        if (neg_response) est_pending <= 1; 
+        if (estab_ack) begin //neg establish ack
+            ilink_established <= 1;
+            hb_cnt <= 0;
+        end
+ 
+        if (!established) begin
+            ilink_established <= 0;
+            neg_pending <= 0; //end tcp session
+            est_pending <= 0;
+        end
     
     end
 end
