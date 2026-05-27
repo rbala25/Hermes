@@ -43,7 +43,7 @@ module tcp_session #(
     input logic [31:0] rx_seq_num, 
     input logic header_valid, 
  
-
+ 
     output logic ctrl_start, //tcp tx
     output logic [7:0] ctrl_flags,
     output logic [31:0] ctrl_ack_num,
@@ -59,7 +59,7 @@ module tcp_session #(
     output logic established,
     output logic closed
 );
-
+ 
 typedef enum logic [2:0] {
     S_CLOSED,
     S_SYN_SENT,
@@ -75,7 +75,8 @@ logic [31:0] retransmit_cnt;
 logic [31:0] keepalive_cnt;
 logic [31:0] ack_num_r; //ack num
 logic tx_busy; //tcp_tx is mid-segment
-
+logic remote_fin_seen; //set when remote initiates close
+ 
 always_ff @(posedge clk) begin
     if (rst) begin
         state <= S_CLOSED;
@@ -93,18 +94,15 @@ always_ff @(posedge clk) begin
         established <= 0;
         closed <= 1;
         tx_grant <= 0;
+        remote_fin_seen <= 0;
     end else begin
         ctrl_start <= 0;
         load_seq <= 0;
-
+ 
         if (ctrl_start) tx_busy <= 1;
         if (tx_done) tx_busy <= 0;
  
         if (header_valid) begin
-//            if (rx_syn || rx_fin)
-//                ack_num_r <= rx_seq_num + 32'd1;
-//            else
-//                ack_num_r <= rx_seq_num + 32'd1; 
               ack_num_r <= rx_seq_num + 32'd1; 
         end
  
@@ -116,12 +114,14 @@ always_ff @(posedge clk) begin
             tx_busy <= 0;
             keepalive_cnt <= 0;
             retransmit_cnt <= 0;
+            remote_fin_seen <= 0;
         end else begin
             unique case (state)
                 S_CLOSED: begin
                     established <= 0;
                     closed <= 1;
                     tx_grant <= 0;
+                    remote_fin_seen <= 0;
                     if (connect) begin
                         init_seq <= isn;
                         load_seq <= 1;
@@ -140,8 +140,8 @@ always_ff @(posedge clk) begin
                     closed <= 0;
                     tx_grant <= 0;
                     retransmit_cnt <= retransmit_cnt + 1;
-                    if (header_valid && rx_syn && rx_ack) begin //received SYN-ACK
-                        ctrl_flags <= 8'h10; //ACK
+                    if (header_valid && rx_syn && rx_ack) begin //received syn ack
+                        ctrl_flags <= 8'h10; //ack
                         ctrl_ack_num <= rx_seq_num + 32'd1; //direct
                         ctrl_tcp_length <= 16'd20;
                         ctrl_payload_csum <= 0;
@@ -183,6 +183,7 @@ always_ff @(posedge clk) begin
                         ctrl_payload_csum <= 0;
                         ctrl_start <= 1;
                         keepalive_cnt <= 0;
+                        remote_fin_seen <= 1;
                         state <= S_FIN_WAIT_1;
                     end else if (keepalive_cnt >= KEEPALIVE_CYCLES && !tx_busy) begin
                         ctrl_flags <= 8'h10; 
@@ -194,20 +195,23 @@ always_ff @(posedge clk) begin
                     end
                 end
  
-                S_FIN_WAIT_1: begin
-                    established <= 0;
-                    closed <= 0;
-                    tx_grant <= 0;
-                    if (header_valid && rx_ack) begin
+            S_FIN_WAIT_1: begin
+                established <= 0;
+                closed <= 0;
+                tx_grant <= 0;
+                if (header_valid && rx_ack) begin
+                    if (remote_fin_seen)
+                        state <= S_TIME_WAIT;
+                    else
                         state <= S_FIN_WAIT_2;
-                    end
                 end
+            end 
  
                 S_FIN_WAIT_2: begin //ignoring any data after they ack our fin
                     established <= 0;
                     closed <= 0;
                     tx_grant <= 0;
-                    if (header_valid && rx_fin) begin //send final ack
+                    if (!remote_fin_seen && header_valid && rx_fin) begin 
                         ctrl_flags <= 8'h10; //ack
                         ctrl_ack_num <= ack_num_r;
                         ctrl_tcp_length <= 16'd20;
@@ -215,7 +219,7 @@ always_ff @(posedge clk) begin
                         ctrl_start <= 1;
                         retransmit_cnt <= 0;
                         state <= S_TIME_WAIT;
-                    end
+                    end 
                 end
  
                 S_TIME_WAIT: begin
@@ -232,5 +236,5 @@ always_ff @(posedge clk) begin
         end
     end
 end
-
+ 
 endmodule
