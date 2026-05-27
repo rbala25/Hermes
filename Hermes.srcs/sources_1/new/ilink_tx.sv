@@ -155,8 +155,6 @@ logic [16:0] csum_fold_w; //checksum helpers
 logic [15:0] csum_final_w;
 assign csum_fold_w = csum_accum[15:0] + csum_accum[31:16];
 assign csum_final_w = csum_fold_w[15:0] + {15'h0, csum_fold_w[16]};
- 
-logic [7:0] cur_byte;
 
 logic [63:0] nos_price_c;
 logic [31:0] nos_qty_c;
@@ -258,7 +256,50 @@ assign next_tx_cnt = (payload_in_ready && state == s_tx && tx_cnt != msg_len - 8
 assign payload_in_data = msg_buf[next_tx_cnt];
 assign payload_in_last = (state == s_tx) && (next_tx_cnt == msg_len - 8'd1);
  
-assign flags = 8'h18; //always 0x18 (ack and psh) for data segments
+assign flags = 8'h18; //always 0x18 (ack and psh) for data
 
-
+always_ff @(posedge clk) begin
+    if (rst) begin
+        state <= s_idle;
+        cur_msg <= mtype_sequence;
+        seq_num <= 32'd1;
+        cur_seq <= 0;
+        build_cnt <= 0;
+        tx_cnt <= 0;
+        csum_accum <= 0;
+        msg_len <= 0;
+        hb_cnt <= 0;
+        established_prev <= 0;
+        ilink_established <= 0;
+        neg_pending <= 0;
+        est_pending <= 0;
+        seq_pending <= 0;
+        nos_bid_pending <= 0;
+        nos_ask_pending <= 0;
+        ocr_bid_pending <= 0;
+        ocr_ask_pending <= 0;
+        nos_dir_pending <= 0;
+        lat_bid_price <= 0;
+        lat_bid_size <= 0;
+        lat_ask_price <= 0;
+        lat_ask_size <= 0;
+        lat_dir_price <= 0;
+        lat_dir_size <= 0;
+        lat_dir_side <= 0;
+        lat_bid_order_id <= {64{1'b1}}; //null
+        lat_ask_order_id <= {64{1'b1}}; 
+        lat_bid_clord_seq <= 0;
+        lat_ask_clord_seq <= 0;
+        tcp_length <= 0;
+        payload_csum <= 0;
+        payload_in_valid <= 0;
+        start <= 0;
+        for (int i = 0; i < 256; i++) msg_buf[i] <= 0;
+    end else begin
+        start <= 0; 
+        
+        
+    
+    end
+end
 endmodule
