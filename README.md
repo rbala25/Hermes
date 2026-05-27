@@ -1,71 +1,136 @@
 # Hermes
 
-A hardware-accelerated trading system built from scratch on an FPGA. No soft-core processor, no Linux, no drivers — just RTL all the way from raw Ethernet frames to order book updates, running at line rate.
+Hermes is a hardware-accelerated market making engine built entirely on an FPGA.
 
-Built on the Digilent Arty A7-35T (Artix-7). Every layer of the network stack was written by hand in SystemVerilog.
+It receives live CME MDP 3.0 market data directly from Ethernet, reconstructs a real-time order book in hardware, computes fair value from market microstructure signals, and submits quotes back to the exchange over iLink3/FIXP — all with deterministic latency and no CPU in the execution path.
 
----
-
-## Network Stack
-
-A complete Ethernet stack implemented in hardware. Packets come in off the wire as nibbles and get parsed, validated, and acted on entirely in logic.
-
-- **mii_rx / mii_tx** — PHY interface, preamble/SFD handling, nibble-to-byte serialization
-- **eth_parser / eth_tx** — Ethernet header parsing and construction
-- **ip_parser / ip_tx** — IPv4 with header checksum validation and generation
-- **icmp_parser / icmp_tx** — ICMP echo request/reply with checksum adjustment
-
-The RX and TX clocks are asynchronous (the PHY provides them independently). Clock domain crossing is handled with two-flop synchronizers and a CDC pulse for FIFO pointer resets.
-
-### MII vs RGMII
-
-The stack has two PHY interfaces: **MII** (currently running) and **RGMII** (implemented, waiting on hardware).
-
-The Arty A7's onboard DP83848 PHY only supports MII — 4-bit bus, 25MHz clock, 100Mbps max. RGMII runs the same 4-bit bus but clocks both edges (DDR) at 125MHz, giving 1Gbps. The RGMII implementation is complete and ready to drop in — it just needs a gigabit-capable PHY to talk to.
-
-| Interface | Bus width | Clock | Max throughput |
-|-----------|-----------|-------|----------------|
-| MII | 4-bit, single edge | 25 MHz | 100 Mbps |
-| RGMII | 4-bit, both edges (DDR) | 125 MHz | **1 Gbps** |
-
-With a gigabit PHY swap, the same stack runs at 10x the line rate — roughly 81,000 minimum-size frames per second, or ~125 MB/s of payload throughput.
+Built on the Digilent Arty A7-35T (Artix-7 XC7A35T).
 
 ---
 
-## Ping Responder
+## System Overview
 
-The first end-to-end application. Receives an ICMP echo request, buffers the payload in a 256-byte hardware FIFO, and fires a complete echo reply back — MAC swapped, IP swapped, checksum adjusted — entirely in hardware.
+Hermes implements the full trading pipeline directly in RTL:
 
-Rather than recomputing the ICMP checksum from scratch on the reply, the received checksum is adjusted using ones-complement arithmetic. Changing the type field from 8 to 0 is equivalent to adding 0x0800 to the checksum, so the reply checksum costs a single adder.
+```text
+CME MDP 3.0 Market Data
+        ↓
+Ethernet / IPv4 / UDP
+        ↓
+   MDP 3.0 Parser
+        ↓
+  10-Level Order Book
+        ↓
+ Market Making Engine
+(VWAP + OFI + Inventory Skew)
+        ↓
+ Risk Engine / Quote Logic
+        ↓
+ iLink3 / FIXP Order Entry
+        ↓
+ TCP / IP / Ethernet
+```
 
-**IP:** `192.168.1.100` — `ping 192.168.1.100` and it responds.
+Incoming multicast market data is parsed directly on the FPGA. Book state updates in real time, pricing is recomputed continuously, and orders are serialized back onto the wire without software intervention.
 
 ---
 
-## Market Data Parser
+## Market Data + Order Book
 
-Parsed CME MDP 3.0 market data feed directly off UDP frames in hardware. Decoded binary-encoded market data messages at line rate with no software in the path.
+Hermes includes a hardware parser for CME **MDP 3.0** multicast market data with support for incremental refresh, snapshot refresh, and trade summary messages.
+
+Market data updates feed into an on-chip **10-level bid/ask order book**, maintained in real time. The book tracks price and size at each level, validates packet sequencing, detects feed gaps, and resynchronizes from snapshot data when needed.
+
+This order book acts as the core state store for the strategy engine and is updated directly from the exchange feed at line rate.
 
 ---
 
-## Order Book
+## Market Making Engine
 
-Hardware price-level aggregation engine. Maintained best bid and ask, tracked quantity at each level, and processed order book updates as they arrived off the wire — all in logic, all in a single clock domain.
+The quoting engine computes fair value using multiple market signals:
+
+- **VWAP-weighted mid price** across configurable depth levels
+- **Order Flow Imbalance (OFI)** derived from aggressor-side trades
+- **Inventory skew** based on current net position
+
+Rather than quoting around the simple top-of-book midpoint, Hermes prices around a VWAP-derived fair value and dynamically adjusts quotes based on recent trade pressure and inventory exposure.
+
+Generated bid and ask prices are then passed through a risk layer before being submitted to the exchange.
+
+Strategy behavior includes:
+- configurable quote size and spread
+- inventory-aware quote skewing
+- directional quoting during strong one-sided flow
+- periodic quote refresh to avoid stale resting orders
+
+---
+
+## Risk Controls
+
+Hermes includes built-in pre-trade risk checks in hardware, including:
+
+- maximum net position limits
+- order rate limiting
+- realized and unrealized P&L monitoring
+- quote suppression on market-data desynchronization or risk breach
+
+These checks execute inline with quote generation before any order is transmitted.
 
 ---
 
 ## Order Entry
 
-Low-latency order submission over the exchange's native binary protocol. End-to-end latency from market data in to order out measured in nanoseconds, not microseconds.
+Hermes implements native **CME iLink3 / FIXP** order entry directly in RTL.
+
+The transmit path handles:
+- FIXP session negotiation / establishment
+- sequence tracking
+- heartbeat messaging
+- `NewOrderSingle`
+- `OrderCancelRequest`
+
+Orders are serialized directly into TCP/IP/Ethernet frames and transmitted to the exchange without any software networking stack in the path.
+
+---
+
+## Networking + Infrastructure
+
+Supporting the trading engine is a fully custom hardware networking stack with RTL implementations of:
+
+- Ethernet
+- ARP
+- IPv4
+- UDP
+- TCP
+- ICMP
+- MDIO PHY configuration
+
+The design runs with independent RX/TX clock domains connected through asynchronous FIFOs and synchronizers for deterministic packet handling across the receive and transmit pipelines.
+
+Current hardware runs over **100 Mbps MII**, with **RGMII support implemented for future gigabit PHY hardware**.
 
 ---
 
 ## Hardware
 
-| | |
-|---|---|
-| Board | Digilent Arty A7-35T |
+| Component | Value |
+|---|---:|
 | FPGA | Xilinx Artix-7 XC7A35T |
-| PHY | Texas Instruments DP83848J (MII, 100Mbps) |
-| Interface | MII now, RGMII ready |
+| Board | Digilent Arty A7-35T |
+| PHY | TI DP83848J |
+| Interface | MII (100 Mbps), RGMII-ready |
 | Toolchain | Vivado 2025.2 |
+
+---
+
+## Verification
+
+Hermes is verified with module-level and full-system simulation testbenches covering:
+
+- market data parsing
+- order book updates
+- snapshot and incremental replay
+- TCP session establishment
+- end-to-end quote generation
+
+The design is also structured for hardware-in-the-loop testing using replayed CME MDP3 traffic over Ethernet and iLink connectivity against CME certification environments.
