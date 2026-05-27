@@ -30,7 +30,7 @@ parameter [63:0] SESSION_UUID = 64'h0,
 parameter [23:0] SESSION_ID = 24'h0,
 parameter [39:0] FIRM_ID = 40'h0, 
 
-parameter [239:0] SYS_NAME = 240'h0, //all these are just placeholders
+parameter [239:0] SYS_NAME = 240'h0, //all these are just placeholders lol
 parameter [79:0] SYS_VERSION = 80'h0,
 parameter [79:0] SYS_VENDOR = 80'h0, 
 
@@ -252,4 +252,13 @@ always_comb begin
         default: cur_byte = 8'd0;
     endcase
 end
+
+logic [7:0] next_tx_cnt;
+assign next_tx_cnt = (payload_in_ready && state == s_tx && tx_cnt != msg_len - 8'd1) ? tx_cnt + 8'd1 : tx_cnt;
+assign payload_in_data = msg_buf[next_tx_cnt];
+assign payload_in_last = (state == s_tx) && (next_tx_cnt == msg_len - 8'd1);
+ 
+assign flags = 8'h18; //always 0x18 (ack and psh) for data segments
+
+
 endmodule
