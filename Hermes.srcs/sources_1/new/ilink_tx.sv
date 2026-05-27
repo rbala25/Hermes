@@ -156,13 +156,100 @@ logic [15:0] csum_final_w;
 assign csum_fold_w = csum_accum[15:0] + csum_accum[31:16];
 assign csum_final_w = csum_fold_w[15:0] + {15'h0, csum_fold_w[16]};
  
-//----------------------------------------------------------------------
-//combinational byte selection for build state
-//All byte offsets match ilinkbinary_v8.xml field offsets exactly.
-//Body bytes are at msg_buf offset = field_offset + 12 (SOFH + SBE header).
-//----------------------------------------------------------------------
 logic [7:0] cur_byte;
 
+logic [63:0] nos_price_c;
+logic [31:0] nos_qty_c;
+logic [7:0]  nos_side_c;
+logic [63:0] ocr_oid_c;
+logic [7:0]  ocr_side_c;
 
+assign nos_price_c = (cur_msg == mtype_nos_dir) ? lat_dir_price : (cur_msg == mtype_nos_bid) ? lat_bid_price : lat_ask_price;
+assign nos_qty_c = (cur_msg == mtype_nos_dir) ? lat_dir_size : (cur_msg == mtype_nos_bid) ? lat_bid_size : lat_ask_size;
+assign nos_side_c = (cur_msg == mtype_nos_dir) ? (lat_dir_side ? 8'd2 : 8'd1) : (cur_msg == mtype_nos_bid) ? 8'd1 : 8'd2;
+assign ocr_oid_c = (cur_msg == mtype_ocr_bid) ? lat_bid_order_id : lat_ask_order_id;
+assign ocr_side_c = (cur_msg == mtype_ocr_bid) ? 8'd1 : 8'd2;
+ 
+logic [719:0] neg_vec; //90 bytes
+logic [1167:0] est_vec; //146 bytes
+logic [207:0] seq_vec; //26 bytes
+logic [1151:0] nos_vec; //144 bytes
+logic [863:0] ocr_vec; //108 bytes
 
+logic [7:0] cur_byte;
+always_comb begin
+    neg_vec = 0;
+    neg_vec[95:0] = {8'h0,VERSION_LO, 8'h0,SCHEMA_LO, 8'h01,8'hF4, 8'h0,8'd76, 8'hCA,8'hFE, 8'h0,NEG_LEN};
+    neg_vec[12*8 +: 256] = hmac_negotiate; //hmac sig
+    neg_vec[44*8 +: 160] = ACCESS_KEY_ID; //access key id
+    neg_vec[64*8 +: 64] = SESSION_UUID; //session uuid
+    neg_vec[72*8 +: 64] = req_timestamp; //req timestamp
+    neg_vec[80*8 +: 24] = SESSION_ID; //session id
+    neg_vec[83*8 +: 40] = FIRM_ID; //firm id
+
+    est_vec = 0;
+    est_vec[95:0] = {8'h0,VERSION_LO,8'h0,SCHEMA_LO,8'h01,8'hF7,8'h0,8'd132,8'hCA,8'hFE,8'h0,EST_LEN};
+    est_vec[12*8 +: 256] = hmac_establish; //hmac
+    est_vec[44*8 +: 160] = ACCESS_KEY_ID;
+    est_vec[64*8 +: 240] = SYS_NAME;
+    est_vec[94*8 +: 80] = SYS_VERSION;
+    est_vec[104*8 +: 80] = SYS_VENDOR;
+    est_vec[114*8 +: 64] = SESSION_UUID;
+    est_vec[122*8 +: 64] = req_timestamp;
+    est_vec[130*8 +: 32] = seq_num;
+    est_vec[134*8 +: 24] = SESSION_ID;
+    est_vec[137*8 +: 40] = FIRM_ID;
+    est_vec[142*8 +: 16] = KEEP_ALIVE_MS; //keep alive
+
+    seq_vec = 0;
+    seq_vec[95:0] = {8'h0,VERSION_LO,8'h0,SCHEMA_LO,8'h01,8'hFA,8'h0,8'd14,8'hCA,8'hFE,8'h0,SEQ_LEN};
+    seq_vec[12*8 +: 64] = SESSION_UUID;
+    seq_vec[20*8 +: 32] = seq_num;
+    seq_vec[24*8 +: 8] = 8'h01; //primary
+
+    nos_vec = 0;
+    nos_vec[95:0] = {8'h0,VERSION_LO,8'h0,SCHEMA_LO,8'h02,8'h02,8'h0,8'd132,8'hCA,8'hFE,8'h0,NOS_LEN};
+    nos_vec[12*8 +: 64] = nos_price_c; //price
+    nos_vec[20*8 +: 32] = nos_qty_c; //qty
+    nos_vec[24*8 +: 32] = SECURITY_ID;
+    nos_vec[28*8 +: 8] = nos_side_c; //side
+    nos_vec[29*8 +: 32] = cur_seq;
+    nos_vec[33*8 +: 160] = SENDER_ID;
+    nos_vec[53*8 +: 32] = cur_seq;
+    nos_vec[73*8 +: 64] = PARTY_DETAILS_REQ_ID;
+    nos_vec[81*8 +: 32] = cur_seq;
+    nos_vec[97*8 +: 64] = PRICE_NULL;
+    nos_vec[105*8 +: 40] = LOCATION;
+    nos_vec[110*8 +: 32] = 32'hFFFFFFFF;
+    nos_vec[114*8 +: 32] = 32'hFFFFFFFF;
+    nos_vec[118*8 +: 16] = 16'hFFFF;
+    nos_vec[120*8 +: 8] = 8'h32;
+    nos_vec[121*8 +: 8] = 8'h01;
+    nos_vec[125*8 +: 8] = 8'hFF;
+    nos_vec[126*8 +: 8] = 8'hFF;
+    nos_vec[128*8 +: 64] = PRICE_NULL;
+    nos_vec[136*8 +: 64] = PRICE_NULL;
+
+    ocr_vec = 0;
+    ocr_vec[95:0] = {8'h0,VERSION_LO,8'h0,SCHEMA_LO,8'h02,8'h04,8'h0,8'd96,8'hCA,8'hFE,8'h0,OCR_LEN};
+    ocr_vec[12*8 +: 64] = ocr_oid_c; //order id
+    ocr_vec[20*8 +: 64] = PARTY_DETAILS_REQ_ID;
+    ocr_vec[29*8 +: 32] = cur_seq;
+    ocr_vec[33*8 +: 160] = SENDER_ID;
+    ocr_vec[53*8 +: 32] = cur_seq;
+    ocr_vec[73*8 +: 32] = cur_seq;
+    ocr_vec[89*8 +: 40] = LOCATION;
+    ocr_vec[94*8 +: 32] = SECURITY_ID;
+    ocr_vec[98*8 +: 8] = ocr_side_c;
+    ocr_vec[99*8 +: 8] = 8'hFF;
+
+    case(cur_msg)
+        mtype_negotiate: cur_byte = neg_vec[{build_cnt,3'b0} +: 8];
+        mtype_establish: cur_byte = est_vec[{build_cnt,3'b0} +: 8];
+        mtype_sequence: cur_byte = seq_vec[{build_cnt,3'b0} +: 8];
+        mtype_nos_bid, mtype_nos_ask, mtype_nos_dir: cur_byte = nos_vec[{build_cnt,3'b0} +: 8];
+        mtype_ocr_bid, mtype_ocr_ask: cur_byte = ocr_vec[{build_cnt,3'b0} +: 8];
+        default: cur_byte = 8'd0;
+    endcase
+end
 endmodule
