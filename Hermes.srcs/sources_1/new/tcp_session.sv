@@ -200,10 +200,10 @@ always_ff @(posedge clk) begin
                 closed <= 0;
                 tx_grant <= 0;
                 if (header_valid && rx_ack) begin
-                    if (remote_fin_seen)
+                    if (remote_fin_seen) begin
+                        retransmit_cnt <= 0;
                         state <= S_TIME_WAIT;
-                    else
-                        state <= S_FIN_WAIT_2;
+                    end else state <= S_FIN_WAIT_2;
                 end
             end 
  
@@ -211,7 +211,7 @@ always_ff @(posedge clk) begin
                     established <= 0;
                     closed <= 0;
                     tx_grant <= 0;
-                    if (!remote_fin_seen && header_valid && rx_fin) begin 
+                    if (header_valid && rx_fin) begin 
                         ctrl_flags <= 8'h10; //ack
                         ctrl_ack_num <= ack_num_r;
                         ctrl_tcp_length <= 16'd20;
