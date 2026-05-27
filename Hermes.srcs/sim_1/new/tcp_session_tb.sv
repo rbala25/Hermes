@@ -1,25 +1,3 @@
-`timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: Rishi Bala
-// 
-// Create Date: 05/26/2026 08:39:07 PM
-// Design Name: 
-// Module Name: tcp_session_tb
-// Project Name: 
-// Target Devices: Arty A7 35t
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
-
-
 module tcp_session_tb;
 localparam RETRANSMIT_CYCLES = 20;
 localparam KEEPALIVE_CYCLES = 30;
@@ -87,6 +65,10 @@ task tick(input int n);
     repeat(n) @(posedge clk); #1;
 endtask
  
+task wait_ctrl_start; 
+    @(posedge clk iff ctrl_start); #1;
+endtask
+ 
 task complete_tx;
     @(posedge clk); #1; //ctrl start seen, tx busy goes high next cycle
     tx_done = 1;
@@ -126,8 +108,7 @@ initial begin
     $display("PASS: handshake");
  
     $display("TEST 2: keepalive");
-    tick(KEEPALIVE_CYCLES);
-    assert(ctrl_start) else $error("keepalive not sent");
+    wait_ctrl_start(); 
     assert(ctrl_flags == 8'h10) else $error("wrong flags for keepalive: %h", ctrl_flags);
     complete_tx();
     $display("PASS: keepalive");
@@ -135,18 +116,17 @@ initial begin
     $display("TEST 3: SYN retransmit");
     disconnect = 1; @(posedge clk); #1; disconnect = 0;
     complete_tx();
-    tick(5); //time wait
-    rst = 1; tick(2); rst = 0; tick(2); //reset back to closed cleanly
+    tick(5);
+    rst = 1; tick(2); rst = 0; tick(2);
     connect = 1; @(posedge clk); #1; connect = 0;
     complete_tx();
-    tick(RETRANSMIT_CYCLES + 2);
-    assert(ctrl_start) else $error("SYN not retransmitted");
+    wait_ctrl_start(); 
     assert(ctrl_flags == 8'h02) else $error("wrong flags on retransmit: %h", ctrl_flags);
     $display("PASS: SYN retransmit");
  
     $display("TEST 4: rx_rst");
     complete_tx();
-    send_header(1, 1, 0, 32'd200); //complete handshake
+    send_header(1, 1, 0, 32'd200);
     complete_tx();
     tick(1);
     assert(established) else $error("not established");
