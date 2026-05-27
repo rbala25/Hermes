@@ -161,7 +161,7 @@ always_ff @(posedge rx_clk) begin
             end
  
             options: begin
-                //discarding all option bytes, tcp_session needs to handle
+                //discarding all option bytes, mss can be ignored
                 data_in_ready <= 1;
                 if (data_in_valid) begin
                     options_remaining <= options_remaining - 1;
