@@ -65,9 +65,9 @@ parameter [31:0] SECURITY_ID = 32'h0
     output logic payload_in_last, //last byte
     input logic payload_in_ready,
  
-    //order signals from mm_core
+
     input logic quote_valid,
-    input logic [63:0] bid_price, //PRICE9 mantissa (int64 * 10^-9)
+    input logic [63:0] bid_price,
     input logic [31:0] bid_size,
     input logic [63:0] ask_price,
     input logic [31:0] ask_size,
@@ -78,11 +78,90 @@ parameter [31:0] SECURITY_ID = 32'h0
     input logic [63:0] directional_price,
     input logic [31:0] directional_size,
  
-    //exchange-assigned OrderIDs from ilink_rx (for cancel messages)
-    //set to 0xFFFFFFFFFFFFFFFF if not yet received (OCR will use null OrderID)
     input logic [63:0] bid_order_id,
     input logic [63:0] ask_order_id
 );
+
+typedef enum logic [2:0] {
+    mtype_negotiate,
+    mtype_establish,
+    mtype_sequence,
+    mtype_nos_bid,
+    mtype_nos_ask,
+    mtype_ocr_bid,
+    mtype_ocr_ask,
+    mtype_nos_dir
+} mtype_t;
+ 
+typedef enum logic [2:0] {
+    s_idle,
+    s_build,
+    s_csum,
+    s_wait_grant,
+    s_tx,
+    s_wait_done
+} state_t;
+ 
+state_t state;
+mtype_t cur_msg;
+
+localparam [7:0] NEG_LEN = 8'd90;
+localparam [7:0] EST_LEN = 8'd146;
+localparam [7:0] SEQ_LEN = 8'd26;
+localparam [7:0] NOS_LEN = 8'd144;
+localparam [7:0] OCR_LEN = 8'd108;
+
+localparam [7:0] SCHEMA_LO = 8'd8; //v8
+localparam [7:0] VERSION_LO = 8'd8;
+ 
+localparam [63:0] PRICE_NULL = 64'h7FFFFFFFFFFFFFFF; //price9 null mantissa
+localparam [63:0] U64_NULL = 64'hFFFFFFFFFFFFFFFF;
+ 
+logic [7:0] msg_buf [0:255];
+logic [7:0] msg_len; //byte count of current message
+logic [7:0] build_cnt;
+logic [7:0] tx_cnt;
+logic [31:0] csum_accum;
+ 
+logic [31:0] seq_num;
+logic [31:0] cur_seq;
+ 
+logic [31:0] hb_cnt;
+logic established_prev;
+ 
+logic neg_pending;
+logic est_pending;
+logic seq_pending;
+logic nos_bid_pending;
+logic nos_ask_pending;
+logic ocr_bid_pending;
+logic ocr_ask_pending;
+logic nos_dir_pending;
+ 
+logic [63:0] lat_bid_price;
+logic [31:0] lat_bid_size;
+logic [63:0] lat_ask_price;
+logic [31:0] lat_ask_size;
+logic [63:0] lat_dir_price;
+logic [31:0] lat_dir_size;
+logic lat_dir_side;
+logic [63:0] lat_bid_order_id;
+logic [63:0] lat_ask_order_id;
+
+logic [31:0] lat_bid_clord_seq;
+logic [31:0] lat_ask_clord_seq;
+ 
+logic [16:0] csum_fold_w; //checksum helpers
+logic [15:0] csum_final_w;
+assign csum_fold_w = csum_accum[15:0] + csum_accum[31:16];
+assign csum_final_w = csum_fold_w[15:0] + {15'h0, csum_fold_w[16]};
+ 
+//----------------------------------------------------------------------
+//combinational byte selection for build state
+//All byte offsets match ilinkbinary_v8.xml field offsets exactly.
+//Body bytes are at msg_buf offset = field_offset + 12 (SOFH + SBE header).
+//----------------------------------------------------------------------
+logic [7:0] cur_byte;
 
 
 
