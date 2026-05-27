@@ -60,4 +60,20 @@ module tcp_session #(
     output logic closed
 );
 
+typedef enum logic [2:0] {
+    S_CLOSED,
+    S_SYN_SENT,
+    S_ESTABLISHED,
+    S_FIN_WAIT_1,
+    S_FIN_WAIT_2,
+    S_TIME_WAIT
+} state_t;
+ 
+state_t state;
+ 
+logic [31:0] retransmit_cnt;
+logic [31:0] keepalive_cnt;
+logic [31:0] ack_num_r; //ack num
+logic tx_busy; //tcp_tx is mid-segment
+
 endmodule
