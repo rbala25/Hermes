@@ -430,11 +430,23 @@ always_ff @(posedge clk) begin
             end
             
             s_build: begin
-            
+                msg_buf[build_cnt] <= cur_byte;
+                if (!build_cnt[0]) //high byte for even
+                    csum_accum <= csum_accum + {16'h0, cur_byte, 8'h0};
+                else //low byte for odd
+                    csum_accum <= csum_accum + {24'h0, cur_byte};
+                if (build_cnt == msg_len - 8'd1) begin
+                    build_cnt <= 0;
+                    state <= s_csum;
+                end else begin
+                    build_cnt <= build_cnt + 8'd1;
+                end
             end
             
             s_csum: begin
-            
+                payload_csum <= csum_final_w;
+                tcp_length <= 16'd20 + {8'h0, msg_len};
+                state <= s_wait_grant;
             end
             
             s_wait_grant: begin
