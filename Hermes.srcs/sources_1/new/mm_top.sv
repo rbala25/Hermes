@@ -54,8 +54,32 @@ module mm_top #(
     output logic [3:0] txd,
     output logic tx_en,
     output logic uart_tx,
-    output logic [3:0] led
+    output logic [3:0] led,
+    
+    input logic clk_100,
+    output logic eth_ref_clk,
+    output logic eth_rstn
 );
+
+logic locked;
+clk_gen u_clk_gen (
+    .clk_100(clk_100),
+    .clk_25(eth_ref_clk),
+    .locked(locked)
+);
+
+logic [19:0] rst_cnt;
+logic phy_rstn;
+always_ff @(posedge clk_100) begin
+    if (!locked) begin
+        rst_cnt <= 0;
+        phy_rstn <= 0;
+    end else if (!phy_rstn) begin
+        rst_cnt <= rst_cnt + 1;
+        if (rst_cnt == 20'hFFFFF) phy_rstn <= 1;
+    end
+end
+assign eth_rstn = phy_rstn;
  
 logic [7:0] mii_rx_data; //mii rx outputs
 logic mii_rx_valid;
