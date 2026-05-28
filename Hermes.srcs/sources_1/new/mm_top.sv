@@ -824,10 +824,12 @@ logic [31:0] uart_price_latch;
 logic uart_side_latch;
 logic uart_busy; 
 
-logic uart_busy_r;
+logic uart_tx_done;
+logic uart_tx_done_r;
+
 always_ff @(posedge tx_clk) begin
-    if (rst) uart_busy_r <= 0;
-    else uart_busy_r <= uart_busy;
+    if (rst) uart_tx_done_r <= 0;
+    else uart_tx_done_r <= uart_tx_done; //defensive
 end
 
 always_ff @(posedge tx_clk) begin
@@ -854,7 +856,7 @@ always_ff @(posedge tx_clk) begin
             end
 
             UART_FILL: begin
-                if (!uart_busy && !uart_busy_r) begin
+                if ((uart_seq == 0 && !uart_busy) || (uart_seq > 0 && uart_tx_done_r)) begin
                     case (uart_seq)
                         4'd0: uart_data <= uart_side_latch ? 8'h53 : 8'h42;
                         4'd1: uart_data <= hex_char(uart_price_latch[31:28]);
@@ -866,10 +868,11 @@ always_ff @(posedge tx_clk) begin
                         4'd7: uart_data <= hex_char(uart_price_latch[7:4]);
                         4'd8: uart_data <= hex_char(uart_price_latch[3:0]);
                         4'd9: uart_data <= 8'h0A;
+                        4'd10: uart_data <= 8'h0A;
                         default: uart_data <= 8'h0A;
                     endcase
                     uart_ready <= 1;
-                    if (uart_seq >= 4'd9) begin
+                    if (uart_seq >= 4'd10) begin
                         uart_seq <= 0;
                         uart_state <= UART_IDLE;
                     end else begin
@@ -879,7 +882,7 @@ always_ff @(posedge tx_clk) begin
             end
             
             UART_STATUS: begin
-                if (!uart_busy && !uart_busy_r) begin
+                if ((uart_seq == 0 && !uart_busy) || (uart_seq > 0 && uart_tx_done_r)) begin
                     case (uart_seq)
                         4'd0: uart_data <= 8'h53;
                         4'd1: begin
@@ -903,10 +906,11 @@ always_ff @(posedge tx_clk) begin
                             endcase
                         end
                         4'd2: uart_data <= 8'h0A;
+                        4'd3: uart_data <= 8'h0A;
                         default: uart_data <= 8'h0A;
                     endcase
                     uart_ready <= 1;
-                    if (uart_seq >= 4'd2) begin
+                    if (uart_seq >= 4'd3) begin
                         uart_seq <= 0;
                         uart_state <= UART_IDLE;
                     end else begin
@@ -966,9 +970,9 @@ uarttx u_uarttx (
     .data(uart_data),
     .ready(uart_ready),
     .busy(uart_busy),
+    .tx_done(uart_tx_done),
     .tx(uart_tx)
 );
- 
 mii_rx u_mii_rx (
     .rxclk(rx_clk),
     .rxd(rxd),

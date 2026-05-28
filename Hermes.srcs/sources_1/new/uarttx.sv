@@ -20,31 +20,31 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module uarttx(output logic tx, output logic busy, input logic baud, input logic [7:0] data, input logic ready, input logic rst, input logic clk);
- logic [9:0] sr;
- logic [3:0] count;
+module uarttx(output logic tx, output logic busy, output logic tx_done, input logic baud, input logic [7:0] data, input logic ready, input logic rst, input logic clk);
+    logic [9:0] sr;
+    logic [3:0] count;
 
 always_ff @(posedge clk) begin
- if(rst) begin
-  sr <= 8'b0;
-  busy <= 0;
-  count <= 0;
-  tx <= 1;
- end else if(ready && !busy) begin
-  sr <= {1'b1, data, 1'b0};
-  busy <= 1'b1;
-  count <= 0;
- end else if(busy && baud) begin
-  if(count < 10) begin
-   tx <= sr[0];
-   sr <= sr >> 1;
-   count <= count + 1;
-  end else begin
-   busy <= 0;
-   tx <= 1;
-  end
- end
- 
+    tx_done <= 0;
+    if (rst) begin
+        sr <= 0;
+        busy <= 0;
+        count <= 0;
+        tx <= 1;
+    end else if (ready && !busy) begin
+        sr <= {1'b1, data, 1'b0};
+        busy <= 1;
+        count <= 0;
+    end else if (busy && baud) begin
+        if (count < 10) begin
+            tx <= sr[0];
+            sr <= sr >> 1;
+            count <= count + 1;
+        end else begin
+            busy <= 0;
+            tx <= 1;
+            tx_done <= 1;
+        end
+    end
 end
-
 endmodule
