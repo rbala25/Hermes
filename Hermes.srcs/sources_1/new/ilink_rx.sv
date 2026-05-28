@@ -60,8 +60,7 @@ module ilink_rx(
     output logic [7:0] fill_side,
     output logic [159:0] fill_clord_id,
     output logic [319:0] exec_id,
- 
-    //additional decoded fields
+
     output logic [15:0] ord_rej_reason,
     output logic [15:0] cxl_rej_reason,
     output logic [63:0] order_id_out,
@@ -71,8 +70,7 @@ module ilink_rx(
  
 logic dispatch_pending;
 logic [15:0] dispatch_tid;
- 
-//gap detection latch — set on last body byte, fired on dispatch cycle
+
 logic gap_pending;
 logic [31:0] gap_from_latch;
 logic [31:0] gap_count_latch;
@@ -87,5 +85,37 @@ typedef enum logic [2:0] {
  
 state_t state;
 
+logic [15:0] pos;
+logic [15:0] sofh_total_len; 
+logic [15:0] template_id;
+logic [15:0] block_length;
+
+logic [31:0] expected_seq; //for gap detection
+logic expected_seq_valid;
+ 
+logic [31:0] f_seq_num; //intermediate latches
+logic [31:0] f_next_seq_no;
+logic [31:0] f_rx_next_seq_no;
+logic [7:0] f_keepalive_lapsed;
+logic [383:0] f_reject_reason;
+logic signed [63:0] f_price;
+logic signed [63:0] f_last_px;
+logic [63:0] f_order_id;
+logic [31:0] f_order_qty;
+logic [31:0] f_last_qty;
+logic [31:0] f_cum_qty;
+logic [31:0] f_leaves_qty;
+logic [7:0] f_side;
+logic [7:0] f_aggressor;
+logic [7:0] f_exec_restatement_reason;
+logic [15:0] f_ord_rej_reason;
+logic [15:0] f_cxl_rej_reason;
+logic [319:0] f_exec_id;
+logic [159:0] f_clord_id;
+logic [63:0] f_ocr_order_id;
+logic [159:0] f_ocr_clord_id;
+logic [15:0] f_ocr_cxl_rej_reason;
+logic [2047:0] f_biz_text;
+logic [15:0] f_biz_rej_reason;
 
 endmodule
