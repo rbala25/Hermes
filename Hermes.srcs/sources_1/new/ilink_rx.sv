@@ -130,4 +130,97 @@ assign clord_off_72  = bpos - 16'd72;
 assign clord_off_328 = bpos - 16'd328;
 assign biz_text_off  = bpos - 16'd12;
 
+always_ff @(posedge clk) begin
+    if (rst) begin
+        state <= s_idle;
+        pos <= 0;
+        sofh_total_len <= 0;
+        template_id <= 0;
+        block_length <= 0;
+        expected_seq <= 0;
+        expected_seq_valid <= 0;
+        bid_order_id <= {64{1'b1}};
+        dispatch_pending <= 0;
+        dispatch_tid <= 0;
+        gap_pending <= 0;
+        gap_from_latch <= 0;
+        gap_count_latch <= 0;
+        ask_order_id <= {64{1'b1}};
+
+        neg_response <= 0;
+        estab_ack <= 0;
+        session_error <= 0;
+        send_sequence <= 0;
+        exec_new <= 0;
+        exec_reject <= 0;
+        exec_elimination <= 0;
+        exec_trade <= 0;
+        exec_modify <= 0;
+        exec_cancel <= 0;
+        unsolicited_cancel <= 0;
+        ocr_reject <= 0;
+        business_reject <= 0;
+        gap_detected <= 0;
+
+        reject_reason <= 0;
+        next_seq_no <= 0;
+        rx_next_seq_no <= 0;
+        gap_from_seq <= 0;
+        gap_count <= 0;
+        fill_price <= 0;
+        fill_qty <= 0;
+        fill_leaves_qty <= 0;
+        fill_cum_qty <= 0;
+        fill_side <= 0;
+        fill_clord_id <= 0;
+        exec_id <= 0;
+        ord_rej_reason <= 0;
+        cxl_rej_reason <= 0;
+        order_id_out <= 0;
+        biz_rej_reason <= 0;
+        biz_text <= 0;
+        payload_ready <= 0;
+        //clear field temps
+        f_seq_num <= 0;
+        f_next_seq_no <= 0;
+        f_rx_next_seq_no <= 0;
+        f_keepalive_lapsed <= 0;
+        f_reject_reason <= 0;
+        f_price <= 0;
+        f_last_px <= 0;
+        f_order_id <= 0;
+        f_order_qty <= 0;
+        f_last_qty <= 0;
+        f_cum_qty <= 0;
+        f_leaves_qty <= 0;
+        f_side <= 0;
+        f_aggressor <= 0;
+        f_exec_restatement_reason <= 8'hFF;
+        f_ord_rej_reason <= 0;
+        f_cxl_rej_reason <= 0;
+        f_exec_id <= 0;
+        f_clord_id <= 0;
+        f_ocr_order_id <= 0;
+        f_ocr_clord_id <= 0;
+        f_ocr_cxl_rej_reason <= 0;
+        f_biz_text <= 0;
+        f_biz_rej_reason <= 0;
+    end else begin
+        neg_response <= 0;
+        estab_ack <= 0;
+        session_error <= 0;
+        send_sequence <= 0;
+        exec_new <= 0;
+        exec_reject <= 0;
+        exec_elimination <= 0;
+        exec_trade <= 0;
+        exec_modify <= 0;
+        exec_cancel <= 0;
+        unsolicited_cancel <= 0;
+        ocr_reject <= 0;
+        business_reject <= 0;
+        gap_detected <= 0;
+        
+    end
+end
 endmodule
