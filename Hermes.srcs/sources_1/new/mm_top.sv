@@ -767,12 +767,6 @@ always_ff @(posedge tx_clk) begin
     end
 end
  
-//DEBUG LEDS
-assign led[0] = session_error_tx; //ilink session error
-assign led[1] = ob_gap_detected; //order book gap
-assign led[2] = ilrx_exec_trade; //fill received
-assign led[3] = ob_book_valid; //book live
- 
 //assign uart_tx = 1'b1; //temp until i wire uart module
 
 logic [7:0] baud_cnt;
@@ -1452,5 +1446,15 @@ arp_handler #(
     .payload_valid(arp_payload_valid),
     .payload_ready(arp_payload_ready)
 );
+
+//DEBUG LEDS
+//assign led[0] = session_error_tx; //ilink session error
+//assign led[1] = ob_gap_detected; //order book gap
+//assign led[2] = ilrx_exec_trade; //fill received
+//assign led[3] = ob_book_valid; //book live
+assign led[0] = mdio_done; // PHY init complete
+assign led[1] = mii_rx_valid; // any RX nibbles arriving (will flicker)
+assign led[2] = eth_header_valid; // eth frames parsed
+assign led[3] = arp_pending; // ARP request received and queued
  
 endmodule
