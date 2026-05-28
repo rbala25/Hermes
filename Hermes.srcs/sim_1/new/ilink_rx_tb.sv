@@ -74,7 +74,7 @@ task automatic send_byte(input logic [7:0] b);
     @(negedge clk);
     payload_data = b;
     payload_valid = 1;
-    @(posedge clk); #1; //DUT samples; let NBAs settle
+    @(posedge clk); #1;
     @(negedge clk);
     payload_valid = 0;
 endtask
@@ -124,9 +124,9 @@ endtask
  
 task automatic test_neg_response();
     $display("\n--- Test 1+2: NegotiationResponse (501) templateID parse ---");
-    init_frame(12, 0, 501); //blk=0: dispatch fires on last SBE header byte
+    init_frame(12, 0, 501); 
     flush_frame();
-    tick(); //dispatch_pending fires on this clock
+    tick(); //dispatch pending fires
     #1;
     check("templateID 501 / neg_response pulse", neg_response);
 endtask
@@ -218,10 +218,9 @@ task automatic test_exec_cancel();
 endtask
 
 task automatic test_gap();
-    //expected_seq=6 after SeqNum 4 and 5 from test 6
     $display("\n--- Test 7: Gap detection ---");
     init_frame(12+226, 226, 522);
-    f32(bp(0), 32'd10); //jump from 6 to 10
+    f32(bp(0), 32'd10); 
     f8(bp(190), 8'd1);
     flush_frame();
     tick(); #1;
