@@ -1292,7 +1292,8 @@ end
 
 always_ff @(posedge tx_clk) begin
     if (rst) begin
-        tcp_connect_sent <= 0;
+//        tcp_connect_sent <= 0;
+        tcp_connect_sent <= 1; //test
         tcp_connect_pulse <= 0;
     end else begin
         tcp_connect_pulse <= 0;
