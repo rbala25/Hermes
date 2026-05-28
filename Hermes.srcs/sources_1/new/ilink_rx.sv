@@ -221,6 +221,16 @@ always_ff @(posedge clk) begin
         business_reject <= 0;
         gap_detected <= 0;
         
+        if (dispatch_pending) begin //one cycle extra bc of NBA's and f_ latches
+            dispatch_pending <= 0;
+            if (gap_pending) begin
+                gap_pending <= 0;
+                gap_detected <= 1;
+                gap_from_seq <= gap_from_latch;
+                gap_count <= gap_count_latch;
+            end
+            
+        end
     end
 end
 endmodule
