@@ -256,4 +256,49 @@ always @(posedge tx_clk) begin
     end
 end
 
+initial begin
+    $dumpfile("mm_top_tb.vcd");
+    $dumpvars(0, mm_top_tb);
+ 
+    repeat(10) @(posedge rx_clk);
+    @(posedge rx_clk);
+    rst <= 0;
+    $display("t=%0t reset released", $time);
+ 
+    repeat(20) @(posedge rx_clk);
+
+    $display("t=%0t sending ARP request", $time);
+    send_arp_request(48'hAABBCCDDEEFF, 32'hC0A80101);
+    repeat(100) @(posedge tx_clk);
+    $display("t=%0t ARP test done, led=%b", $time, led);
+ 
+    $display("t=%0t sending ICMP ping", $time);
+    send_ping(48'hAABBCCDDEEFF, 32'hC0A80101, 16'h0001, 16'h0001);
+    repeat(200) @(posedge tx_clk);
+    $display("t=%0t ICMP test done", $time);
+ 
+    repeat(50) @(posedge tx_clk);
+    $display("t=%0t sending TCP SYN-ACK", $time);
+    send_tcp_synack(48'hAABBCCDDEEFF, 32'hC0A80101, 32'h12345678, 32'hDEADBEF0);
+    repeat(300) @(posedge tx_clk);
+    $display("t=%0t TCP test done, established=%b led=%b",
+             $time, dut.sess_established, led);
+
+    if (led[3] !== 1'b0)
+        $display("WARN: book_valid unexpectedly high before market data");
+    else
+        $display("t=%0t book_valid correctly low", $time);
+ 
+    repeat(50) @(posedge tx_clk);
+    $display("t=%0t total TX frames sent: %0d", $time, tx_frame_count);
+    $display("t=%0t simulation done", $time);
+    $finish;
+end
+ 
+initial begin
+    #5_000_000;
+    $display("TIMEOUT");
+    $finish;
+end
+
 endmodule
