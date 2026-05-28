@@ -608,7 +608,7 @@ logic [15:0] tcp_length_mux;
 logic [15:0] tcp_payload_csum_mux;
 logic [31:0] tcp_ack_num_mux;
  
-assign tcp_start_mux = sess_ctrl_start ? sess_ctrl_start : iltx_start;
+assign tcp_start_mux = sess_ctrl_start ? sess_ctrl_start : iltx_start; //ctrl_start from tcp session
 assign tcp_flags_mux = sess_ctrl_start ? sess_ctrl_flags : iltx_flags;
 assign tcp_length_mux = sess_ctrl_start ? sess_ctrl_tcp_length : iltx_tcp_length;
 assign tcp_payload_csum_mux = sess_ctrl_start ? sess_ctrl_payload_csum : iltx_payload_csum;
@@ -696,7 +696,7 @@ always_ff @(posedge tx_clk) begin
     end
 end
  
-always_ff @(posedge tx_clk) begin
+always_ff @(posedge tx_clk) begin //main fsm
     if (rst) begin
         tx_state <= TX_IDLE;
         ethtx_start <= 0;
