@@ -135,6 +135,7 @@ task automatic send_eth_frame(input logic [47:0] dst_mac, input logic [47:0] src
     send_byte(etype[15:8]);
     send_byte(etype[7:0]);
     for (int i = 0; i < payload_len; i++) send_byte(payload[i]);
+    send_byte(8'h00); send_byte(8'h00); send_byte(8'h00); send_byte(8'h00);
     @(posedge rx_clk);
     rx_dv <= 0;
     rxd <= 0;
