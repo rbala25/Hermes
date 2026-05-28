@@ -154,76 +154,53 @@ task automatic send_ip_frame(
     integer ip_total_len;
     ip_total_len = 20 + ip_payload_len;
     eth_payload = new[ip_total_len];
-    eth_payload[0] = 8'h45;
-    eth_payload[1] = 8'h00;
-    eth_payload[2] = ip_total_len[15:8];
-    eth_payload[3] = ip_total_len[7:0];
-    eth_payload[4] = 8'h00;
-    eth_payload[5] = 8'h01;
-    eth_payload[6] = 8'h00;
-    eth_payload[7] = 8'h00;
-    eth_payload[8] = 8'h40;
-    eth_payload[9] = protocol;
-    eth_payload[10] = 8'h00;
-    eth_payload[11] = 8'h00;
-    eth_payload[12] = src_ip[31:24];
-    eth_payload[13] = src_ip[23:16];
-    eth_payload[14] = src_ip[15:8];
-    eth_payload[15] = src_ip[7:0];
-    eth_payload[16] = dst_ip[31:24];
-    eth_payload[17] = dst_ip[23:16];
-    eth_payload[18] = dst_ip[15:8];
-    eth_payload[19] = dst_ip[7:0];
+    eth_payload[0] = 8'h45; eth_payload[1] = 8'h00;
+    eth_payload[2] = ip_total_len[15:8]; eth_payload[3] = ip_total_len[7:0];
+    eth_payload[4] = 8'h00; eth_payload[5] = 8'h01;
+    eth_payload[6] = 8'h00; eth_payload[7] = 8'h00;
+    eth_payload[8] = 8'h40; eth_payload[9] = protocol;
+    eth_payload[10] = 8'h00; eth_payload[11] = 8'h00;
+    eth_payload[12] = src_ip[31:24]; eth_payload[13] = src_ip[23:16];
+    eth_payload[14] = src_ip[15:8];  eth_payload[15] = src_ip[7:0];
+    eth_payload[16] = dst_ip[31:24]; eth_payload[17] = dst_ip[23:16];
+    eth_payload[18] = dst_ip[15:8];  eth_payload[19] = dst_ip[7:0];
     for (int i = 0; i < ip_payload_len; i++) eth_payload[20+i] = ip_payload[i];
     send_eth_frame(dst_mac, src_mac, 16'h0800, eth_payload, ip_total_len);
 endtask
  
-task automatic send_arp_request(
-    input logic [47:0] src_mac,
-    input logic [31:0] src_ip
-);
+task automatic send_arp_request(input logic [47:0] src_mac, input logic [31:0] src_ip);
     logic [7:0] arp_payload [28];
-    arp_payload[0] = 8'h00; arp_payload[1] = 8'h01;
-    arp_payload[2] = 8'h08; arp_payload[3] = 8'h00;
-    arp_payload[4] = 8'h06; arp_payload[5] = 8'h04;
-    arp_payload[6] = 8'h00; arp_payload[7] = 8'h01;
-    arp_payload[8]  = src_mac[47:40]; arp_payload[9]  = src_mac[39:32];
-    arp_payload[10] = src_mac[31:24]; arp_payload[11] = src_mac[23:16];
-    arp_payload[12] = src_mac[15:8];  arp_payload[13] = src_mac[7:0];
-    arp_payload[14] = src_ip[31:24];  arp_payload[15] = src_ip[23:16];
-    arp_payload[16] = src_ip[15:8];   arp_payload[17] = src_ip[7:0];
-    arp_payload[18] = 0; arp_payload[19] = 0; arp_payload[20] = 0;
-    arp_payload[21] = 0; arp_payload[22] = 0; arp_payload[23] = 0;
-    arp_payload[24] = 8'hC0; arp_payload[25] = 8'hA8;
-    arp_payload[26] = 8'h01; arp_payload[27] = 8'h64;
+    arp_payload[0]=8'h00; arp_payload[1]=8'h01; arp_payload[2]=8'h08; arp_payload[3]=8'h00;
+    arp_payload[4]=8'h06; arp_payload[5]=8'h04; arp_payload[6]=8'h00; arp_payload[7]=8'h01;
+    arp_payload[8]=src_mac[47:40]; arp_payload[9]=src_mac[39:32]; arp_payload[10]=src_mac[31:24];
+    arp_payload[11]=src_mac[23:16]; arp_payload[12]=src_mac[15:8]; arp_payload[13]=src_mac[7:0];
+    arp_payload[14]=src_ip[31:24]; arp_payload[15]=src_ip[23:16];
+    arp_payload[16]=src_ip[15:8]; arp_payload[17]=src_ip[7:0];
+    arp_payload[18]=0; arp_payload[19]=0; arp_payload[20]=0;
+    arp_payload[21]=0; arp_payload[22]=0; arp_payload[23]=0;
+    arp_payload[24]=8'hC0; arp_payload[25]=8'hA8; arp_payload[26]=8'h01; arp_payload[27]=8'h64;
     send_eth_frame(48'hFFFFFFFFFFFF, src_mac, 16'h0806, arp_payload, 28);
 endtask
  
 task automatic send_ping(
-    input logic [47:0] src_mac,
-    input logic [31:0] src_ip,
-    input logic [15:0] identifier,
-    input logic [15:0] seq
+    input logic [47:0] src_mac, input logic [31:0] src_ip,
+    input logic [15:0] identifier, input logic [15:0] seq
 );
     logic [7:0] icmp [16];
     logic [7:0] ip_payload [];
     ip_payload = new[16];
-    icmp[0] = 8'h08; icmp[1] = 8'h00; icmp[2] = 8'h00; icmp[3] = 8'h00;
-    icmp[4] = identifier[15:8]; icmp[5] = identifier[7:0];
-    icmp[6] = seq[15:8]; icmp[7] = seq[7:0];
-    icmp[8]  = 8'hDE; icmp[9]  = 8'hAD;
-    icmp[10] = 8'hBE; icmp[11] = 8'hEF;
-    icmp[12] = 8'hCA; icmp[13] = 8'hFE;
-    icmp[14] = 8'hBA; icmp[15] = 8'hBE;
+    icmp[0]=8'h08; icmp[1]=8'h00; icmp[2]=8'h00; icmp[3]=8'h00;
+    icmp[4]=identifier[15:8]; icmp[5]=identifier[7:0];
+    icmp[6]=seq[15:8]; icmp[7]=seq[7:0];
+    icmp[8]=8'hDE; icmp[9]=8'hAD; icmp[10]=8'hBE; icmp[11]=8'hEF;
+    icmp[12]=8'hCA; icmp[13]=8'hFE; icmp[14]=8'hBA; icmp[15]=8'hBE;
     for (int i = 0; i < 16; i++) ip_payload[i] = icmp[i];
     send_ip_frame(48'h00183E03E41B, src_mac, src_ip, 32'hC0A80164, 8'h01, ip_payload, 16);
 endtask
  
 task automatic send_tcp_synack(
-    input logic [47:0] src_mac,
-    input logic [31:0] src_ip,
-    input logic [31:0] seq_num,
-    input logic [31:0] ack_num
+    input logic [47:0] src_mac, input logic [31:0] src_ip,
+    input logic [31:0] seq_num, input logic [31:0] ack_num
 );
     logic [15:0] csum;
     logic [7:0] tcp [20];
@@ -231,8 +208,7 @@ task automatic send_tcp_synack(
     ip_payload = new[20];
     csum = tcp_checksum(src_ip, 32'hC0A80164, 16'd20, 16'd10000, 16'd12345,
                         seq_num, ack_num, 8'h50, 8'h12, 16'hFFFF);
-    tcp[0]=8'h27; tcp[1]=8'h10;
-    tcp[2]=8'h30; tcp[3]=8'h39;
+    tcp[0]=8'h27; tcp[1]=8'h10; tcp[2]=8'h30; tcp[3]=8'h39;
     tcp[4]=seq_num[31:24]; tcp[5]=seq_num[23:16];
     tcp[6]=seq_num[15:8];  tcp[7]=seq_num[7:0];
     tcp[8]=ack_num[31:24]; tcp[9]=ack_num[23:16];
@@ -252,6 +228,24 @@ always @(posedge tx_clk) begin
         tx_frame_count++;
         $display("t=%0t TX frame #%0d sent", $time, tx_frame_count);
     end
+end
+ 
+//watch for header_valid, syn, ack going high on rx_clk
+always @(posedge rx_clk) begin
+    if (dut.tcprx_header_valid)
+        $display("t=%0t [RX] tcp_rx header_valid! syn=%b ack=%b csum_err=%b flags=%02X",
+                 $time, dut.tcprx_rx_syn, dut.tcprx_rx_ack,
+                 dut.tcprx_csum_error, dut.tcprx_flags);
+    if (dut.tcprx_csum_error)
+        $display("t=%0t [RX] tcp_rx csum_error!", $time);
+end
+ 
+//watch for packed sync reaching tx side
+always @(posedge tx_clk) begin
+    if (dut.tcprx_hv_tx)
+        $display("t=%0t [TX] tcprx_hv_tx high! syn=%b ack=%b", $time, dut.tcprx_syn_tx, dut.tcprx_ack_tx);
+    if (dut.sess_established)
+        $display("t=%0t [TX] TCP ESTABLISHED!", $time);
 end
  
 initial begin
@@ -277,11 +271,7 @@ initial begin
     repeat(300) @(posedge tx_clk);
     $display("t=%0t sending TCP SYN-ACK", $time);
     send_tcp_synack(48'hAABBCCDDEEFF, 32'hC0A80101, 32'h12345678, 32'hDEADBEF0);
-    repeat(50) @(posedge tx_clk);
-    $display("t=%0t csum_error=%b header_valid=%b rx_syn=%b rx_ack=%b established=%b",
-             $time, dut.tcprx_csum_error, dut.tcprx_header_valid,
-             dut.tcprx_rx_syn, dut.tcprx_rx_ack, dut.sess_established);
-    repeat(300) @(posedge tx_clk);
+    repeat(500) @(posedge tx_clk);
     $display("t=%0t TCP test done, established=%b led=%b", $time, dut.sess_established, led);
  
     if (led[3] !== 1'b0)
