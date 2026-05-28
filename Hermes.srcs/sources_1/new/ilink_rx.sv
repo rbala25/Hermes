@@ -11,6 +11,20 @@
 // Tool Versions: 
 // Description: 
 // 
+
+//501 - negotiation response, 502 - negotiation rej
+//504 - establishment ack, 505 - estab rej
+//506 - seq (heartbeat)
+//507 - terminate
+//521 - business reject (app level)
+//522 - exec report new
+//523 - exec report reject
+//524 - exec report elimination
+//525 - exec report trade outright (yay)
+//531 - exec report modfiy
+//534 - exec report cancel
+//535 - order cancel reject
+
 // Dependencies: 
 // 
 // Revision:
@@ -180,7 +194,7 @@ always_ff @(posedge clk) begin
         biz_rej_reason <= 0;
         biz_text <= 0;
         payload_ready <= 0;
-        //clear field temps
+
         f_seq_num <= 0;
         f_next_seq_no <= 0;
         f_rx_next_seq_no <= 0;
@@ -230,6 +244,109 @@ always_ff @(posedge clk) begin
                 gap_count <= gap_count_latch;
             end
             
+            case (dispatch_tid)
+                16'd501: neg_response <= 1; //no fields
+ 
+                16'd502: begin
+                    session_error <= 1;
+                    reject_reason <= f_reject_reason;
+                end
+ 
+                16'd504: begin
+                    estab_ack <= 1;
+                    next_seq_no <= f_next_seq_no;
+                    expected_seq <= f_next_seq_no;
+                    expected_seq_valid <= 1;
+                end
+ 
+                16'd505: begin
+                    session_error <= 1;
+                    reject_reason <= f_reject_reason;
+                end
+ 
+                16'd506: begin
+                    rx_next_seq_no <= f_rx_next_seq_no;
+                    if (f_keepalive_lapsed == 8'd1) send_sequence <= 1; //1 - heartbeat lapsed
+                end
+ 
+                16'd507: begin
+                    session_error <= 1;
+                    reject_reason <= f_reject_reason;
+                end
+ 
+                16'd521: begin
+                    biz_text <= f_biz_text;
+                    biz_rej_reason <= f_biz_rej_reason;
+                    business_reject <= 1;
+                end
+ 
+                16'd522: begin
+                    exec_id <= f_exec_id;
+                    fill_clord_id <= f_clord_id;
+                    order_id_out <= f_order_id;
+                    fill_price <= f_price;
+                    fill_side <= f_side;
+                    fill_qty <= f_order_qty;
+                    if (f_side == 8'd1) bid_order_id <= f_order_id;
+                    else if (f_side == 8'd2) ask_order_id <= f_order_id;
+                    exec_new <= 1;
+                end
+ 
+                16'd523: begin
+                    fill_clord_id <= f_clord_id;
+                    fill_side <= f_side;
+                    ord_rej_reason <= f_ord_rej_reason;
+                    exec_reject <= 1;
+                end
+ 
+                16'd524: begin
+                    fill_clord_id <= f_clord_id;
+                    order_id_out <= f_order_id;
+                    fill_cum_qty <= f_cum_qty;
+                    fill_side <= f_side;
+                    exec_elimination <= 1;
+                end
+ 
+                16'd525: begin
+                    exec_id <= f_exec_id;
+                    fill_clord_id <= f_clord_id;
+                    fill_price <= f_last_px;
+                    order_id_out <= f_order_id;
+                    fill_qty <= f_last_qty;
+                    fill_cum_qty <= f_cum_qty;
+                    fill_leaves_qty <= f_leaves_qty;
+                    fill_side <= f_side;
+                    exec_trade <= 1;
+                end
+ 
+                16'd531: begin
+                    fill_clord_id <= f_clord_id;
+                    order_id_out <= f_order_id;
+                    fill_price <= f_price;
+                    fill_cum_qty <= f_cum_qty;
+                    fill_leaves_qty <= f_leaves_qty;
+                    fill_side <= f_side;
+                    exec_modify <= 1;
+                end
+ 
+                16'd534: begin
+                    fill_clord_id <= f_clord_id;
+                    order_id_out <= f_order_id;
+                    fill_cum_qty <= f_cum_qty;
+                    fill_side <= f_side;
+                    exec_cancel <= 1;
+                    if (f_exec_restatement_reason != 8'hFF) unsolicited_cancel <= 1;
+                end
+ 
+                16'd535: begin
+                    fill_clord_id <= f_ocr_clord_id;
+                    order_id_out <= f_ocr_order_id;
+                    cxl_rej_reason <= f_ocr_cxl_rej_reason;
+                    ocr_reject <= 1;
+                end
+ 
+                default: ;
+            endcase
         end
     end
 end
