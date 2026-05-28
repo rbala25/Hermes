@@ -354,11 +354,47 @@ always_ff @(posedge clk) begin
         if(payload_valid) begin
             unique case (state)
                 s_idle: begin
-                
+                    sofh_total_len[7:0] <= payload_data;
+                    pos <= 1;
+                    state <= s_sofh;
                 end
                 
                 s_sofh: begin
-                
+                    case (pos)
+                        16'd1: sofh_total_len[15:8] <= payload_data;
+                        16'd2: ; //ignore encoding type
+                        16'd3: begin
+                            block_length <= 0;
+                            template_id <= 0;
+                            f_seq_num <= 0;
+                            f_next_seq_no <= 0;
+                            f_rx_next_seq_no <= 0;
+                            f_keepalive_lapsed <= 0;
+                            f_reject_reason <= 0;
+                            f_price <= 0;
+                            f_last_px <= 0;
+                            f_order_id <= 0;
+                            f_order_qty <= 0;
+                            f_last_qty <= 0;
+                            f_cum_qty <= 0;
+                            f_leaves_qty <= 0;
+                            f_side <= 0;
+                            f_aggressor <= 0;
+                            f_exec_restatement_reason <= 8'hFF;
+                            f_ord_rej_reason <= 0;
+                            f_cxl_rej_reason <= 0;
+                            f_exec_id <= 0;
+                            f_clord_id <= 0;
+                            f_ocr_order_id <= 0;
+                            f_ocr_clord_id <= 0;
+                            f_ocr_cxl_rej_reason <= 0;
+                            f_biz_text <= 0;
+                            f_biz_rej_reason <= 0;
+                            state <= s_sbe_hdr;
+                        end
+                        default: ;
+                    endcase
+                    pos <= pos + 16'd1;
                 end
                 
                 s_sbe_hdr: begin
