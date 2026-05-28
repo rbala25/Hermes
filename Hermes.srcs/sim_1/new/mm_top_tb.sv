@@ -231,7 +231,6 @@ always @(posedge tx_clk) begin
     end
 end
  
-//watch for header_valid, syn, ack going high on rx_clk
 always @(posedge rx_clk) begin
     if (dut.tcprx_header_valid)
         $display("t=%0t [RX] tcp_rx header_valid! syn=%b ack=%b csum_err=%b flags=%02X",
@@ -240,8 +239,7 @@ always @(posedge rx_clk) begin
     if (dut.tcprx_csum_error)
         $display("t=%0t [RX] tcp_rx csum_error!", $time);
 end
- 
-//watch for packed sync reaching tx side
+
 always @(posedge tx_clk) begin
     if (dut.tcprx_hv_tx)
         $display("t=%0t [TX] tcprx_hv_tx high! syn=%b ack=%b", $time, dut.tcprx_syn_tx, dut.tcprx_ack_tx);
