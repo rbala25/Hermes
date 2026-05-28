@@ -118,4 +118,16 @@ logic [15:0] f_ocr_cxl_rej_reason;
 logic [2047:0] f_biz_text;
 logic [15:0] f_biz_rej_reason;
 
+logic [15:0] bpos; //body ctr
+assign bpos = pos - 16'd12;
+
+logic [15:0] exec_id_off;   //bpos - 12
+logic [15:0] clord_off_72;  //bpos - 72
+logic [15:0] clord_off_328; //bpos - 328 
+logic [15:0] biz_text_off;  //bpos - 12
+assign exec_id_off   = bpos - 16'd12;
+assign clord_off_72  = bpos - 16'd72;
+assign clord_off_328 = bpos - 16'd328;
+assign biz_text_off  = bpos - 16'd12;
+
 endmodule
