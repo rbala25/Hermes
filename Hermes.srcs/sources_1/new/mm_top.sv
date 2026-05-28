@@ -876,7 +876,26 @@ always_ff @(posedge tx_clk) begin
                 if (!uart_busy) begin
                     case (uart_seq)
                         4'd0: uart_data <= 8'h53;
-                        4'd1: uart_data <= hex_char({ob_gap_detected, session_error_tx, ob_book_valid, sess_established});
+                        4'd1: begin
+                            case ({ob_gap_detected, session_error_tx, ob_book_valid, sess_established})
+                                4'h0: uart_data <= 8'h30;
+                                4'h1: uart_data <= 8'h31;
+                                4'h2: uart_data <= 8'h32;
+                                4'h3: uart_data <= 8'h33;
+                                4'h4: uart_data <= 8'h34;
+                                4'h5: uart_data <= 8'h35;
+                                4'h6: uart_data <= 8'h36;
+                                4'h7: uart_data <= 8'h37;
+                                4'h8: uart_data <= 8'h38;
+                                4'h9: uart_data <= 8'h39;
+                                4'hA: uart_data <= 8'h41;
+                                4'hB: uart_data <= 8'h42;
+                                4'hC: uart_data <= 8'h43;
+                                4'hD: uart_data <= 8'h44;
+                                4'hE: uart_data <= 8'h45;
+                                4'hF: uart_data <= 8'h46;
+                            endcase
+                        end
                         4'd2: uart_data <= 8'h0A;
                         default: uart_data <= 8'h0A;
                     endcase
