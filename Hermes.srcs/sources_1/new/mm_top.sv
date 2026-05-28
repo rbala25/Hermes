@@ -559,4 +559,477 @@ assign led[1] = ob_gap_detected; //order book gap
 assign led[2] = ilrx_exec_trade; //fill received 
 assign led[3] = ob_book_valid; //book live 
 
+assign uart_tx = 1'b1; // will do fr later
+mii_rx u_mii_rx (
+    .rxclk(rx_clk),
+    .rxd(rxd),
+    .rx_dv(rx_dv),
+    .rx_er(1'b0),
+    .rst(rst),
+    .data(mii_rx_data),
+    .valid(mii_rx_valid),
+    .frame_active(mii_rx_frame_active)
+);
+ 
+eth_parser u_eth_parser (
+    .clk(rx_clk),
+    .rst(rst),
+    .data(mii_rx_data),
+    .valid(mii_rx_valid),
+    .frame_active(mii_rx_frame_active),
+    .dest_mac(eth_dest_mac),
+    .src_mac(eth_src_mac),
+    .ether_type(eth_ether_type),
+    .header_valid(eth_header_valid),
+    .payload_data(eth_payload_data),
+    .payload_valid(eth_payload_valid),
+    .frame_done(eth_frame_done),
+    .error(eth_error)
+);
+ 
+ip_parser u_ip_parser (
+    .clk(rx_clk),
+    .rst(rst),
+    .payload(eth_payload_data),
+    .payload_valid(eth_payload_valid),
+    .header_valid(eth_header_valid),
+    .ether(eth_ether_type),
+    .frame_done(eth_frame_done),
+    .error(eth_error),
+    .ip_version(ip_version),
+    .ip_ihl(ip_ihl),
+    .ip_dscp(ip_dscp),
+    .ip_total_len(ip_total_len),
+    .ip_id(ip_id),
+    .ip_flags(ip_flags),
+    .ip_frag_offset(ip_frag_offset),
+    .ip_ttl(ip_ttl),
+    .ip_protocol(ip_protocol),
+    .ip_checksum(ip_checksum),
+    .ip_src(ip_src),
+    .ip_dest(ip_dest),
+    .ip_header_valid(ip_header_valid),
+    .ip_checksum_val(ip_checksum_val),
+    .ip_is_fragment(ip_is_fragment),
+    .ip_payload_data(ip_payload_data),
+    .ip_payload_valid(ip_payload_valid),
+    .ip_payload_done(ip_payload_done),
+    .ip_error(ip_error)
+);
+ 
+
+udp_parser u_udp_parser (
+    .clk(rx_clk),
+    .rst(rst),
+    .payload_data(ip_payload_data),
+    .payload_valid(ip_payload_valid && (ip_protocol == 8'h11)),
+    .ip_header_valid(ip_header_valid),
+    .ip_payload_done(ip_payload_done),
+    .error(ip_error),
+    .ip_protocol(ip_protocol),
+    .ip_src(ip_src),
+    .ip_dest(ip_dest),
+    .udp_src(udp_src),
+    .udp_dest(udp_dest),
+    .udp_length(udp_length),
+    .udp_checksum(udp_checksum),
+    .udp_header_valid(udp_header_valid),
+    .udp_checksum_val(udp_checksum_val),
+    .udp_payload(udp_payload),
+    .udp_payload_valid(udp_payload_valid),
+    .udp_payload_done(udp_payload_done),
+    .udp_error(udp_error)
+);
+ 
+mdp_parser #(
+    .port(MDP_PORT),
+    .sec_id(SEC_ID)
+) u_mdp_parser (
+    .clk(rx_clk),
+    .rst(rst),
+    .udp_payload(udp_payload),
+    .udp_payload_valid(udp_payload_valid),
+    .udp_payload_done(udp_payload_done),
+    .udp_header_valid(udp_header_valid),
+    .udp_dest(udp_dest),
+    .udp_error(udp_error),
+    .mdp_seq_num(mdp_seq_num),
+    .mdp_sending_time(mdp_sending_time),
+    .mdp_pkt_valid(mdp_pkt_valid),
+    .entry_price(mdp_entry_price),
+    .entry_size(mdp_entry_size),
+    .entry_price_level(mdp_entry_price_level),
+    .entry_update_action(mdp_entry_update_action),
+    .entry_type(mdp_entry_type),
+    .is_snapshot(mdp_is_snapshot),
+    .entry_valid(mdp_entry_valid),
+    .mdp_done(mdp_done),
+    .mdp_error(mdp_error),
+    .trade_price(mdp_trade_price),
+    .trade_size(mdp_trade_size),
+    .trade_aggressor(mdp_trade_aggressor),
+    .trade_valid(mdp_trade_valid)
+);
+ 
+order_book u_order_book (
+    .clk(rx_clk),
+    .rst(rst),
+    .entry_price(mdp_entry_price),
+    .entry_size(mdp_entry_size),
+    .entry_price_level(mdp_entry_price_level),
+    .entry_update_action(mdp_entry_update_action),
+    .entry_type(mdp_entry_type),
+    .is_snapshot(mdp_is_snapshot),
+    .entry_valid(mdp_entry_valid),
+    .mdp_done(mdp_done),
+    .mdp_seq_num(mdp_seq_num),
+    .mdp_pkt_valid(mdp_pkt_valid),
+    .best_bid_price(ob_best_bid_price),
+    .best_bid_size(ob_best_bid_size),
+    .best_ask_price(ob_best_ask_price),
+    .best_ask_size(ob_best_ask_size),
+    .rd_level(ob_rd_level),
+    .rd_side(ob_rd_side),
+    .rd_price(ob_rd_price),
+    .rd_size(ob_rd_size),
+    .book_valid(ob_book_valid),
+    .gap_detected(ob_gap_detected)
+);
+
+tcp_rx u_tcp_rx (
+    .rx_clk(rx_clk),
+    .rst(rst),
+    .src_ip(ip_src),
+    .dst_ip(ip_dest),
+    .tcp_length(tcp_segment_length),
+    .data_in(ip_payload_data),
+    .data_in_valid(tcp_ip_payload_valid),
+    .data_in_last(tcp_ip_payload_done_rx),
+    .data_in_ready(tcprx_data_in_ready),
+    .src_port(tcprx_src_port),
+    .dst_port(tcprx_dst_port),
+    .seq_num(tcprx_seq_num),
+    .ack_num(tcprx_ack_num),
+    .flags(tcprx_flags),
+    .window_size(tcprx_window_size),
+    .header_valid(tcprx_header_valid),
+    .payload_data(tcprx_payload_data),
+    .payload_valid(tcprx_payload_valid),
+    .payload_ready(tcprx_payload_ready),
+    .rx_syn(tcprx_rx_syn),
+    .rx_ack(tcprx_rx_ack),
+    .rx_fin(tcprx_rx_fin),
+    .rx_rst(tcprx_rx_rst),
+    .csum_error(tcprx_csum_error)
+);
+ 
+ilink_rx u_ilink_rx (
+    .clk(rx_clk),
+    .rst(rst),
+    .payload_data(tcprx_payload_data),
+    .payload_valid(tcprx_payload_valid),
+    .payload_ready(ilrx_payload_ready),
+    .neg_response(ilrx_neg_response),
+    .estab_ack(ilrx_estab_ack),
+    .session_error(ilrx_session_error),
+    .reject_reason(ilrx_reject_reason),
+    .next_seq_no(ilrx_next_seq_no),
+    .rx_next_seq_no(ilrx_rx_next_seq_no),
+    .send_sequence(ilrx_send_sequence),
+    .bid_order_id(ilrx_bid_order_id),
+    .ask_order_id(ilrx_ask_order_id),
+    .exec_new(ilrx_exec_new),
+    .exec_reject(ilrx_exec_reject),
+    .exec_elimination(ilrx_exec_elimination),
+    .exec_trade(ilrx_exec_trade),
+    .exec_modify(ilrx_exec_modify),
+    .exec_cancel(ilrx_exec_cancel),
+    .unsolicited_cancel(ilrx_unsolicited_cancel),
+    .ocr_reject(ilrx_ocr_reject),
+    .business_reject(ilrx_business_reject),
+    .gap_detected(ilrx_gap_detected),
+    .gap_from_seq(ilrx_gap_from_seq),
+    .gap_count(ilrx_gap_count),
+    .fill_price(ilrx_fill_price),
+    .fill_qty(ilrx_fill_qty),
+    .fill_leaves_qty(ilrx_fill_leaves_qty),
+    .fill_cum_qty(ilrx_fill_cum_qty),
+    .fill_side(ilrx_fill_side),
+    .fill_clord_id(ilrx_fill_clord_id),
+    .exec_id(ilrx_exec_id),
+    .ord_rej_reason(ilrx_ord_rej_reason),
+    .cxl_rej_reason(ilrx_cxl_rej_reason),
+    .order_id_out(ilrx_order_id_out),
+    .biz_rej_reason(ilrx_biz_rej_reason),
+    .biz_text(ilrx_biz_text)
+);
+ 
+assign tcprx_payload_ready = ilrx_payload_ready;
+ 
+//icmp_parser u_icmp_parser (
+//    .clk(rx_clk),
+//    .rst(rst),
+//    .payload(ip_payload_data),
+//    .payload_valid(ip_payload_valid),
+//    .ip_header_valid(ip_header_valid),
+//    .ip_payload_done(ip_payload_done),
+//    .ip_protocol(ip_protocol),
+//    .error(ip_error),
+//    .icmp_type(icmp_type),
+//    .icmp_code(icmp_code),
+//    .icmp_checksum(icmp_checksum_rx),
+//    .icmp_identifier(icmp_identifier),
+//    .icmp_seq_num(icmp_seq_num),
+//    .icmp_header_valid(icmp_header_valid),
+//    .icmp_checksum_val(icmp_checksum_val),
+//    .icmp_payload_data(icmp_payload_data),
+//    .icmp_payload_valid(icmp_payload_valid),
+//    .icmp_payload_done(icmp_payload_done),
+//    .icmp_error(icmp_error)
+//);
+ 
+//icmp_csum_adjust u_csum_adjust (
+//    .csum_in(rep_icmp_checksum_rx),
+//    .csum_out(icmp_checksum_tx)
+//);
+ 
+//icmp_tx u_icmp_tx (
+//    .tx_clk(tx_clk),
+//    .rst(rst),
+//    .identifier(rep_identifier),
+//    .seq(rep_seq),
+//    .icmp_checksum(icmp_checksum_tx),
+//    .start(icmp_tx_start),
+//    .done(icmp_tx_done),
+//    .payload_in_data(icmp_fifo_mem[icmp_fifo_rd_ptr]),
+//    .payload_in_valid(icmp_fifo_valid_tx),
+//    .payload_in_ready(icmp_fifo_ready),
+//    .payload_data(ictx_data),
+//    .payload_valid(ictx_valid),
+//    .payload_ready(ictx_ready)
+//);
+ 
+//------------------------------------------------------------------------------
+//TX STACK
+//------------------------------------------------------------------------------
+ 
+mm_core #(
+    .HALF_SPREAD(HALF_SPREAD),
+    .MAX_POSITION(MAX_POSITION),
+    .QUOTE_SIZE(QUOTE_SIZE),
+    .MAX_ORDER_RATE(MAX_ORDER_RATE),
+    .LOSS_LIMIT(LOSS_LIMIT),
+    .VWAP_LEVELS(VWAP_LEVELS),
+    .SKEW_PER_CONTRACT(SKEW_PER_CONTRACT),
+    .REFRESH_TICKS(REFRESH_TICKS),
+    .CLK_FREQ(CLK_FREQ),
+    .OFI_DECAY_TICKS(OFI_DECAY_TICKS),
+    .OFI_SCALE(OFI_SCALE),
+    .OFI_THRESHOLD(OFI_THRESHOLD)
+) u_mm_core (
+    .clk(tx_clk),
+    .rst(rst),
+    .best_bid_price(mm_best_bid_price_r),
+    .best_bid_size(mm_best_bid_size_r),
+    .best_ask_price(mm_best_ask_price_r),
+    .best_ask_size(mm_best_ask_size_r),
+    .book_valid(mm_book_valid_r),
+    .gap_detected(ob_gap_detected), //rx domain — ok for low-rate gating
+    .rd_level(mm_rd_level),
+    .rd_side(mm_rd_side),
+    .rd_price(ob_rd_price),
+    .rd_size(ob_rd_size),
+    .fill_valid(mm_fill_valid),
+    .fill_price(mm_fill_price),
+    .fill_size(mm_fill_size),
+    .fill_side(mm_fill_side),
+    .trade_price(mm_trade_price_r),
+    .trade_size(mm_trade_size_r),
+    .trade_aggressor(mm_trade_aggressor_r),
+    .trade_valid(mm_trade_valid_r),
+    .bid_price(mm_bid_price),
+    .bid_size(mm_bid_size),
+    .ask_price(mm_ask_price),
+    .ask_size(mm_ask_size),
+    .quote_valid(mm_quote_valid),
+    .cancel_bid(mm_cancel_bid),
+    .cancel_ask(mm_cancel_ask),
+    .risk_breach(mm_risk_breach),
+    .directional_valid(mm_directional_valid),
+    .directional_side(mm_directional_side),
+    .directional_price(mm_directional_price),
+    .directional_size(mm_directional_size)
+);
+ 
+logic tcp_connect_sent; //send once
+logic tcp_connect_pulse;
+always_ff @(posedge tx_clk) begin
+    if (rst) begin
+        tcp_connect_sent <= 0;
+        tcp_connect_pulse <= 0;
+    end else begin
+        tcp_connect_pulse <= 0;
+        if (!tcp_connect_sent && !sess_established) begin
+            tcp_connect_pulse <= 1;
+            tcp_connect_sent <= 1;
+        end
+    end
+end
+ 
+tcp_session #(
+    .RETRANSMIT_CYCLES(RETRANSMIT_CYCLES),
+    .KEEPALIVE_CYCLES(KEEPALIVE_CYCLES)
+) u_tcp_session (
+    .clk(tx_clk),
+    .rst(rst),
+    .connect(tcp_connect_pulse),
+    .disconnect(1'b0),
+    .src_port(SRC_PORT),
+    .dst_port(CME_PORT),
+    .window_size(16'hFFFF),
+    .isn(ISN),
+    .rx_syn(tcprx_syn_tx),
+    .rx_ack(tcprx_ack_tx),
+    .rx_fin(tcprx_fin_tx),
+    .rx_rst(tcprx_rst_tx),
+    .rx_seq_num(tcprx_seq_tx),
+    .header_valid(tcprx_hv_tx),
+    .ctrl_start(sess_ctrl_start),
+    .ctrl_flags(sess_ctrl_flags),
+    .ctrl_ack_num(sess_ctrl_ack_num),
+    .ctrl_tcp_length(sess_ctrl_tcp_length),
+    .ctrl_payload_csum(sess_ctrl_payload_csum),
+    .tx_done(tcptx_done),
+    .load_seq(sess_load_seq),
+    .init_seq(sess_init_seq),
+    .tx_grant(sess_tx_grant),
+    .established(sess_established),
+    .closed(sess_closed)
+);
+ 
+ilink_tx u_ilink_tx (
+    .clk(tx_clk),
+    .rst(rst),
+    .established(sess_established),
+    .hmac_negotiate(HMAC_NEGOTIATE),
+    .hmac_establish(HMAC_ESTABLISH),
+    .req_timestamp(64'h0),
+    .neg_response(neg_response_tx),
+    .estab_ack(estab_ack_tx),
+    .ilink_established(iltx_ilink_established),
+    .tx_grant(sess_tx_grant),
+    .start(iltx_start),
+    .flags(iltx_flags),
+    .tcp_length(iltx_tcp_length),
+    .payload_csum(iltx_payload_csum),
+    .tx_done(tcptx_done),
+    .payload_in_data(iltx_payload_data),
+    .payload_in_valid(iltx_payload_valid),
+    .payload_in_last(iltx_payload_last),
+    .payload_in_ready(iltx_payload_ready),
+    .quote_valid(mm_quote_valid),
+    .bid_price(mm_bid_price),
+    .bid_size(mm_bid_size),
+    .ask_price(mm_ask_price),
+    .ask_size(mm_ask_size),
+    .cancel_bid(mm_cancel_bid),
+    .cancel_ask(mm_cancel_ask),
+    .directional_valid(mm_directional_valid),
+    .directional_side(mm_directional_side),
+    .directional_price(mm_directional_price),
+    .directional_size(mm_directional_size),
+    .bid_order_id(bid_order_id_tx),
+    .ask_order_id(ask_order_id_tx)
+);
+ 
+tcp_tx u_tcp_tx (
+    .tx_clk(tx_clk),
+    .rst(rst),
+    .src_ip(MY_IP),
+    .dst_ip(CME_IP),
+    .tcp_length(tcp_length_mux),
+    .src_port(SRC_PORT),
+    .dst_port(CME_PORT),
+    .ack_num(tcp_ack_num_mux),
+    .flags(tcp_flags_mux),
+    .window_size(16'hFFFF),
+    .payload_csum(tcp_payload_csum_mux),
+    .init_seq(sess_init_seq),
+    .load_seq(sess_load_seq),
+    .start(tcp_start_mux),
+    .done(tcptx_done),
+    .payload_in_data(tcp_pld_data_mux),
+    .payload_in_valid(tcp_pld_valid_mux),
+    .payload_in_last(tcp_pld_last_mux),
+    .payload_in_ready(tcptx_payload_ready),
+    .payload_data(tcptx_payload_data),
+    .payload_valid(tcptx_payload_valid),
+    .payload_ready(ip_payload_mux_ready)
+);
+ 
+ip_tx u_ip_tx (
+    .tx_clk(tx_clk),
+    .rst(rst),
+    .src_ip(MY_IP),
+    .dst_ip(ip_dst_mux),
+    .protocol(ip_protocol_mux),
+    .total_length(ip_total_len_mux),
+    .identification(ip_id_mux),
+    .start(iptx_start),
+    .done(iptx_done),
+    .payload_data(ip_payload_mux_data),
+    .payload_valid(ip_payload_mux_valid),
+    .payload_ready(ip_payload_mux_ready),
+    .tx_data(iptx_data),
+    .tx_valid(iptx_valid),
+    .tx_ready(iptx_ready)
+);
+ 
+eth_tx u_eth_tx (
+    .tx_clk(tx_clk),
+    .rst(rst),
+    .dst_mac(mux_dst_mac),
+    .ether_type(mux_ether_type),
+    .payload_data(mux_payload_data),
+    .payload_valid(mux_payload_valid),
+    .start(ethtx_start),
+    .payload_ready(mux_payload_ready),
+    .done(ethtx_done),
+    .txd(ethtx_data),
+    .tx_valid(ethtx_valid),
+    .tx_ready(ethtx_ready)
+);
+ 
+mii_tx u_mii_tx (
+    .tx_clk(tx_clk),
+    .rst(rst),
+    .data(ethtx_data),
+    .valid(ethtx_valid),
+    .ready(ethtx_ready),
+    .txd(txd),
+    .tx_en(tx_en)
+);
+ 
+arp_handler #(
+    .MY_IP(MY_IP),
+    .MY_MAC(MY_MAC)
+) u_arp_handler (
+    .rx_clk(rx_clk),
+    .tx_clk(tx_clk),
+    .rst(rst),
+    .eth_ether_type(eth_ether_type),
+    .eth_header_valid(eth_header_valid),
+    .eth_payload_data(eth_payload_data),
+    .eth_payload_valid(eth_payload_valid),
+    .eth_frame_done(eth_frame_done),
+    .eth_error(eth_error),
+    .reply_dst_mac(arp_reply_dst_mac),
+    .pending(arp_pending),
+    .start(arp_start),
+    .done(arp_done),
+    .payload_data(arp_payload_data),
+    .payload_valid(arp_payload_valid),
+    .payload_ready(arp_payload_ready)
+);
+ 
 endmodule
