@@ -425,4 +425,90 @@ always_ff @(posedge tx_clk) begin
     end
 end
 
+logic [63:0] mm_bid_price; //mm core
+logic [31:0] mm_bid_size;
+logic [63:0] mm_ask_price;
+logic [31:0] mm_ask_size;
+logic mm_quote_valid;
+logic mm_cancel_bid;
+logic mm_cancel_ask;
+logic mm_risk_breach;
+logic mm_directional_valid;
+logic mm_directional_side;
+logic [63:0] mm_directional_price;
+logic [31:0] mm_directional_size;
+logic [3:0] mm_rd_level;
+logic mm_rd_side;
+
+assign ob_rd_level = mm_rd_level; //is rd port cdc????? *
+assign ob_rd_side = mm_rd_side;
+
+logic iltx_ilink_established; //ilink tx
+logic iltx_start;
+logic [7:0] iltx_flags;
+logic [15:0] iltx_tcp_length;
+logic [15:0] iltx_payload_csum;
+logic [7:0] iltx_payload_data;
+logic iltx_payload_valid;
+logic iltx_payload_last;
+logic iltx_payload_ready;
+
+logic sess_ctrl_start; //tcp session
+logic [7:0] sess_ctrl_flags;
+logic [31:0] sess_ctrl_ack_num;
+logic [15:0] sess_ctrl_tcp_length;
+logic [15:0] sess_ctrl_payload_csum;
+logic sess_load_seq;
+logic [31:0] sess_init_seq;
+logic sess_tx_grant;
+logic sess_established;
+logic sess_closed;
+ 
+logic tcprx_syn_meta, tcprx_syn_tx; //synchronizer ffs
+logic tcprx_ack_meta, tcprx_ack_tx;
+logic tcprx_fin_meta, tcprx_fin_tx;
+logic tcprx_rst_meta, tcprx_rst_tx;
+logic tcprx_hv_meta, tcprx_hv_tx;
+logic [31:0] tcprx_seq_meta, tcprx_seq_tx;
+ 
+always_ff @(posedge tx_clk) begin
+    if (rst) begin
+        tcprx_syn_meta <= 0; 
+        tcprx_syn_tx <= 0;
+        tcprx_ack_meta <= 0; 
+        tcprx_ack_tx <= 0;
+        tcprx_fin_meta <= 0; 
+        tcprx_fin_tx <= 0;
+        tcprx_rst_meta <= 0; 
+        tcprx_rst_tx <= 0;
+        tcprx_hv_meta <= 0; 
+        tcprx_hv_tx <= 0;
+        tcprx_seq_meta <= 0; 
+        tcprx_seq_tx <= 0;
+    end else begin
+        tcprx_syn_meta <= tcprx_rx_syn; 
+        tcprx_syn_tx <= tcprx_syn_meta;
+        
+        tcprx_ack_meta <= tcprx_rx_ack; 
+        tcprx_ack_tx <= tcprx_ack_meta;
+        
+        tcprx_fin_meta <= tcprx_rx_fin; 
+        tcprx_fin_tx <= tcprx_fin_meta;
+        
+        tcprx_rst_meta <= tcprx_rx_rst; 
+        tcprx_rst_tx <= tcprx_rst_meta;
+        
+        tcprx_hv_meta <= tcprx_header_valid; 
+        tcprx_hv_tx <= tcprx_hv_meta;
+        
+        tcprx_seq_meta <= tcprx_seq_num; 
+        tcprx_seq_tx <= tcprx_seq_meta;
+    end
+end
+
+logic [7:0] tcptx_payload_data; //tcp tx to ip tx
+logic tcptx_payload_valid;
+logic tcptx_payload_ready;
+logic tcptx_done;
+
 endmodule
