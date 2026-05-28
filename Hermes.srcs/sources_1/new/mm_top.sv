@@ -537,4 +537,26 @@ logic iptx_ready;
 logic iptx_start;
 logic iptx_done;
 
+logic [7:0] ethtx_data; //eth tx to mii tx
+logic ethtx_valid;
+logic ethtx_ready;
+logic ethtx_done;
+logic ethtx_start;
+ 
+logic [47:0] arp_reply_dst_mac;
+logic arp_pending;
+logic arp_start;
+logic arp_done;
+logic [7:0] arp_payload_data;
+logic arp_payload_valid;
+logic arp_payload_ready;
+
+
+
+//DEBUG LEDS
+assign led[0] = session_error_tx; //ilink session error
+assign led[1] = ob_gap_detected; //order book gap
+assign led[2] = ilrx_exec_trade; //fill received 
+assign led[3] = ob_book_valid; //book live 
+
 endmodule
