@@ -195,7 +195,7 @@ always_ff @(posedge rx_clk) begin
     end
 end
  
-localparam ICMP_FIFO_DEPTH = 256; //icmp fifo
+localparam ICMP_FIFO_DEPTH = 256;
 localparam ICMP_FIFO_AW = $clog2(ICMP_FIFO_DEPTH);
 logic [7:0] icmp_fifo_mem [0:ICMP_FIFO_DEPTH-1];
 logic [ICMP_FIFO_AW-1:0] icmp_fifo_wr_ptr;
@@ -519,8 +519,6 @@ always_ff @(posedge tx_clk) begin
     end
 end
  
- 
- 
 logic [63:0] mm_bid_price; //mm core
 logic [31:0] mm_bid_size;
 logic [63:0] mm_ask_price;
@@ -560,42 +558,48 @@ logic sess_tx_grant;
 logic sess_established;
 logic sess_closed;
  
-logic tcprx_syn_meta, tcprx_syn_tx; //synchronizer ffs
-logic tcprx_ack_meta, tcprx_ack_tx;
-logic tcprx_fin_meta, tcprx_fin_tx;
-logic tcprx_rst_meta, tcprx_rst_tx;
-logic tcprx_hv_meta, tcprx_hv_tx;
-logic [31:0] tcprx_seq_meta, tcprx_seq_tx;
+//pack all tcp_rx header signals into one word on rx_clk when header_valid fires
+//then 2FF the packed word into tx_clk so all signals arrive together
+//this prevents tcp_session from seeing header_valid on a different tx_clk cycle
+//than rx_syn/rx_ack due to independent synchronizer skew
+localparam TCPRX_PACK_W = 1+1+1+1+1+32; //hv, syn, ack, fin, rst, seq
+logic [TCPRX_PACK_W-1:0] tcprx_pack_rx;
+logic [TCPRX_PACK_W-1:0] tcprx_pack_meta, tcprx_pack_tx;
+ 
+always_ff @(posedge rx_clk) begin
+    if (rst) begin
+        tcprx_pack_rx <= 0;
+    end else begin
+        tcprx_pack_rx <= {
+            tcprx_header_valid,
+            tcprx_rx_syn,
+            tcprx_rx_ack,
+            tcprx_rx_fin,
+            tcprx_rx_rst,
+            tcprx_seq_num
+        };
+    end
+end
  
 always_ff @(posedge tx_clk) begin
     if (rst) begin
-        tcprx_syn_meta <= 0;
-        tcprx_syn_tx <= 0;
-        tcprx_ack_meta <= 0;
-        tcprx_ack_tx <= 0;
-        tcprx_fin_meta <= 0;
-        tcprx_fin_tx <= 0;
-        tcprx_rst_meta <= 0;
-        tcprx_rst_tx <= 0;
-        tcprx_hv_meta <= 0;
-        tcprx_hv_tx <= 0;
-        tcprx_seq_meta <= 0;
-        tcprx_seq_tx <= 0;
+        tcprx_pack_meta <= 0;
+        tcprx_pack_tx <= 0;
     end else begin
-        tcprx_syn_meta <= tcprx_rx_syn;
-        tcprx_syn_tx <= tcprx_syn_meta;
-        tcprx_ack_meta <= tcprx_rx_ack;
-        tcprx_ack_tx <= tcprx_ack_meta;
-        tcprx_fin_meta <= tcprx_rx_fin;
-        tcprx_fin_tx <= tcprx_fin_meta;
-        tcprx_rst_meta <= tcprx_rx_rst;
-        tcprx_rst_tx <= tcprx_rst_meta;
-        tcprx_hv_meta <= tcprx_header_valid;
-        tcprx_hv_tx <= tcprx_hv_meta;
-        tcprx_seq_meta <= tcprx_seq_num;
-        tcprx_seq_tx <= tcprx_seq_meta;
+        tcprx_pack_meta <= tcprx_pack_rx;
+        tcprx_pack_tx <= tcprx_pack_meta;
     end
 end
+ 
+logic tcprx_hv_tx;
+logic tcprx_syn_tx;
+logic tcprx_ack_tx;
+logic tcprx_fin_tx;
+logic tcprx_rst_tx;
+logic [31:0] tcprx_seq_tx;
+ 
+assign {tcprx_hv_tx, tcprx_syn_tx, tcprx_ack_tx,
+        tcprx_fin_tx, tcprx_rst_tx, tcprx_seq_tx} = tcprx_pack_tx;
  
 logic [7:0] tcptx_payload_data; //tcp tx to ip tx
 logic tcptx_payload_valid;
@@ -608,7 +612,7 @@ logic [15:0] tcp_length_mux;
 logic [15:0] tcp_payload_csum_mux;
 logic [31:0] tcp_ack_num_mux;
  
-assign tcp_start_mux = sess_ctrl_start ? sess_ctrl_start : iltx_start; //ctrl_start from tcp session
+assign tcp_start_mux = sess_ctrl_start ? sess_ctrl_start : iltx_start;
 assign tcp_flags_mux = sess_ctrl_start ? sess_ctrl_flags : iltx_flags;
 assign tcp_length_mux = sess_ctrl_start ? sess_ctrl_tcp_length : iltx_tcp_length;
 assign tcp_payload_csum_mux = sess_ctrl_start ? sess_ctrl_payload_csum : iltx_payload_csum;
@@ -685,8 +689,8 @@ typedef enum logic [1:0] {
 tx_state_t tx_state;
  
 logic icmp_tx_start;
-
-logic tcp_pending; //latch 
+ 
+logic tcp_pending;
 always_ff @(posedge tx_clk) begin
     if (rst) begin
         tcp_pending <= 0;
@@ -696,7 +700,7 @@ always_ff @(posedge tx_clk) begin
     end
 end
  
-always_ff @(posedge tx_clk) begin //main fsm
+always_ff @(posedge tx_clk) begin
     if (rst) begin
         tx_state <= TX_IDLE;
         ethtx_start <= 0;
@@ -721,7 +725,7 @@ always_ff @(posedge tx_clk) begin //main fsm
                     tx_is_arp <= 0;
                     tx_is_tcp <= 1;
                     tx_state <= TX_WAIT;
-                end else if (icmp_fifo_valid_tx) begin //level pulse, survives waiting
+                end else if (icmp_fifo_valid_tx) begin
                     icmp_tx_start <= 1;
                     ethtx_start <= 1;
                     tx_is_arp <= 0;
@@ -1210,5 +1214,5 @@ arp_handler #(
     .payload_valid(arp_payload_valid),
     .payload_ready(arp_payload_ready)
 );
-
+ 
 endmodule
