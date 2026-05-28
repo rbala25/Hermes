@@ -746,7 +746,25 @@ assign led[1] = ob_gap_detected; //order book gap
 assign led[2] = ilrx_exec_trade; //fill received
 assign led[3] = ob_book_valid; //book live
  
-assign uart_tx = 1'b1;
+//assign uart_tx = 1'b1; //temp until i wire uart module
+
+logic [7:0] baud_cnt;
+logic baud_tick;
+always_ff @(posedge tx_clk) begin
+    if (rst) begin
+        baud_cnt <= 0;
+        baud_tick <= 0;
+    end else begin
+        baud_tick <= 0;
+        if (baud_cnt >= 8'd216) begin
+            baud_tick <= 1;
+            baud_cnt <= 0;
+        end else begin
+            baud_cnt <= baud_cnt + 1;
+        end
+    end
+end
+
  
 mii_rx u_mii_rx (
     .rxclk(rx_clk),
