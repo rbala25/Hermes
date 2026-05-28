@@ -361,4 +361,68 @@ always_ff @(posedge tx_clk) begin
     end
 end
 
+
+
+
+
+logic neg_response_meta, neg_response_tx; //synchronizing response pulses for ilink tx
+always_ff @(posedge tx_clk) begin
+    if (rst) begin
+        neg_response_meta <= 0;
+        neg_response_tx <= 0;
+    end else begin
+        neg_response_meta <= ilrx_neg_response;
+        neg_response_tx <= neg_response_meta;
+    end
+end
+ 
+logic estab_ack_meta, estab_ack_tx; //estab_ack pulse sync
+always_ff @(posedge tx_clk) begin
+    if (rst) begin
+        estab_ack_meta <= 0;
+        estab_ack_tx <= 0;
+    end else begin
+        estab_ack_meta <= ilrx_estab_ack;
+        estab_ack_tx <= estab_ack_meta;
+    end
+end
+
+logic send_sequence_meta, send_sequence_tx;
+always_ff @(posedge tx_clk) begin
+    if (rst) begin
+        send_sequence_meta <= 0;
+        send_sequence_tx <= 0;
+    end else begin
+        send_sequence_meta <= ilrx_send_sequence;
+        send_sequence_tx <= send_sequence_meta;
+    end
+end
+ 
+logic [63:0] bid_order_id_meta, bid_order_id_tx;
+logic [63:0] ask_order_id_meta, ask_order_id_tx;
+always_ff @(posedge tx_clk) begin
+    if (rst) begin
+        bid_order_id_meta <= 0;
+        bid_order_id_tx <= 0;
+        ask_order_id_meta <= 0;
+        ask_order_id_tx <= 0;
+    end else begin
+        bid_order_id_meta <= ilrx_bid_order_id;
+        bid_order_id_tx <= bid_order_id_meta;
+        ask_order_id_meta <= ilrx_ask_order_id;
+        ask_order_id_tx <= ask_order_id_meta;
+    end
+end
+ 
+logic session_error_meta, session_error_tx;
+always_ff @(posedge tx_clk) begin
+    if (rst) begin
+        session_error_meta <= 0;
+        session_error_tx <= 0;
+    end else begin
+        session_error_meta <= ilrx_session_error;
+        session_error_tx <= session_error_meta;
+    end
+end
+
 endmodule
