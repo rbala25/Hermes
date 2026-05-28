@@ -430,7 +430,257 @@ always_ff @(posedge clk) begin
                 end
                 
                 s_body: begin
-                
+                    if ((template_id == 16'd502 || template_id == 16'd505 || template_id == 16'd507) && bpos < 16'd48) begin //reject reason 502, 505, 507
+                        f_reject_reason[{bpos[5:0], 3'b0} +: 8] <= payload_data;
+                    end
+ 
+                    if (template_id == 16'd504) begin
+                        case (bpos)
+                            16'd16: f_next_seq_no[7:0] <= payload_data;
+                            16'd17: f_next_seq_no[15:8] <= payload_data;
+                            16'd18: f_next_seq_no[23:16] <= payload_data;
+                            16'd19: f_next_seq_no[31:24] <= payload_data;
+                            default: ;
+                        endcase
+                    end
+ 
+                    if (template_id == 16'd506) begin
+                        case (bpos)
+                            16'd8:  f_rx_next_seq_no[7:0] <= payload_data;
+                            16'd9:  f_rx_next_seq_no[15:8] <= payload_data;
+                            16'd10: f_rx_next_seq_no[23:16] <= payload_data;
+                            16'd11: f_rx_next_seq_no[31:24] <= payload_data;
+                            16'd13: f_keepalive_lapsed <= payload_data;
+                            default: ;
+                        endcase
+                    end
+ 
+                    if (template_id == 16'd521 || template_id == 16'd522 || template_id == 16'd523 || template_id == 16'd524 || 
+                        template_id == 16'd525 || template_id == 16'd531 || template_id == 16'd534 || template_id == 16'd535) begin
+                        case (bpos) //app messages
+                            16'd0: f_seq_num[7:0] <= payload_data;
+                            16'd1: f_seq_num[15:8] <= payload_data;
+                            16'd2: f_seq_num[23:16] <= payload_data;
+                            16'd3: f_seq_num[31:24] <= payload_data;
+                            default: ;
+                        endcase
+                    end
+ 
+                    if (template_id == 16'd522) begin //exec report new
+                        if (bpos >= 16'd12 && bpos < 16'd52)
+                            f_exec_id[{exec_id_off[5:0], 3'b0} +: 8] <= payload_data;
+                        if (bpos >= 16'd72 && bpos < 16'd92)
+                            f_clord_id[{clord_off_72[4:0], 3'b0} +: 8] <= payload_data;
+                        case (bpos)
+                            16'd100: f_order_id[7:0] <= payload_data;
+                            16'd101: f_order_id[15:8] <= payload_data;
+                            16'd102: f_order_id[23:16] <= payload_data;
+                            16'd103: f_order_id[31:24] <= payload_data;
+                            16'd104: f_order_id[39:32] <= payload_data;
+                            16'd105: f_order_id[47:40] <= payload_data;
+                            16'd106: f_order_id[55:48] <= payload_data;
+                            16'd107: f_order_id[63:56] <= payload_data;
+                            16'd108: f_price[7:0] <= payload_data;
+                            16'd109: f_price[15:8] <= payload_data;
+                            16'd110: f_price[23:16] <= payload_data;
+                            16'd111: f_price[31:24] <= payload_data;
+                            16'd112: f_price[39:32] <= payload_data;
+                            16'd113: f_price[47:40] <= payload_data;
+                            16'd114: f_price[55:48] <= payload_data;
+                            16'd115: f_price[63:56] <= payload_data;
+                            16'd173: f_order_qty[7:0] <= payload_data;
+                            16'd174: f_order_qty[15:8] <= payload_data;
+                            16'd175: f_order_qty[23:16] <= payload_data;
+                            16'd176: f_order_qty[31:24] <= payload_data;
+                            16'd190: f_side <= payload_data;
+                            default: ;
+                        endcase
+                    end
+ 
+                    if (template_id == 16'd523) begin
+                        if (bpos >= 16'd328 && bpos < 16'd348)
+                            f_clord_id[{clord_off_328[4:0], 3'b0} +: 8] <= payload_data;
+                        case (bpos)
+                            16'd441: f_ord_rej_reason[7:0] <= payload_data;
+                            16'd442: f_ord_rej_reason[15:8] <= payload_data;
+                            16'd448: f_side <= payload_data;
+                            default: ;
+                        endcase
+                    end
+ 
+                    if (template_id == 16'd524) begin
+                        if (bpos >= 16'd72 && bpos < 16'd92)
+                            f_clord_id[{clord_off_72[4:0], 3'b0} +: 8] <= payload_data;
+                        case (bpos)
+                            16'd100: f_order_id[7:0] <= payload_data;
+                            16'd101: f_order_id[15:8] <= payload_data;
+                            16'd102: f_order_id[23:16] <= payload_data;
+                            16'd103: f_order_id[31:24] <= payload_data;
+                            16'd104: f_order_id[39:32] <= payload_data;
+                            16'd105: f_order_id[47:40] <= payload_data;
+                            16'd106: f_order_id[55:48] <= payload_data;
+                            16'd107: f_order_id[63:56] <= payload_data;
+                            16'd173: f_cum_qty[7:0] <= payload_data;
+                            16'd174: f_cum_qty[15:8] <= payload_data;
+                            16'd175: f_cum_qty[23:16] <= payload_data;
+                            16'd176: f_cum_qty[31:24] <= payload_data;
+                            16'd192: f_side <= payload_data;
+                            default: ;
+                        endcase
+                    end
+ 
+                    if (template_id == 16'd525) begin
+                        if (bpos >= 16'd12 && bpos < 16'd52)
+                            f_exec_id[{exec_id_off[5:0], 3'b0} +: 8] <= payload_data;
+                        if (bpos >= 16'd72 && bpos < 16'd92)
+                            f_clord_id[{clord_off_72[4:0], 3'b0} +: 8] <= payload_data;
+                        case (bpos)
+                            16'd100: f_last_px[7:0] <= payload_data;
+                            16'd101: f_last_px[15:8] <= payload_data;
+                            16'd102: f_last_px[23:16] <= payload_data;
+                            16'd103: f_last_px[31:24] <= payload_data;
+                            16'd104: f_last_px[39:32] <= payload_data;
+                            16'd105: f_last_px[47:40] <= payload_data;
+                            16'd106: f_last_px[55:48] <= payload_data;
+                            16'd107: f_last_px[63:56] <= payload_data;
+                            16'd108: f_order_id[7:0] <= payload_data;
+                            16'd109: f_order_id[15:8] <= payload_data;
+                            16'd110: f_order_id[23:16] <= payload_data;
+                            16'd111: f_order_id[31:24] <= payload_data;
+                            16'd112: f_order_id[39:32] <= payload_data;
+                            16'd113: f_order_id[47:40] <= payload_data;
+                            16'd114: f_order_id[55:48] <= payload_data;
+                            16'd115: f_order_id[63:56] <= payload_data;
+                            16'd193: f_last_qty[7:0] <= payload_data;
+                            16'd194: f_last_qty[15:8] <= payload_data;
+                            16'd195: f_last_qty[23:16] <= payload_data;
+                            16'd196: f_last_qty[31:24] <= payload_data;
+                            16'd197: f_cum_qty[7:0] <= payload_data;
+                            16'd198: f_cum_qty[15:8] <= payload_data;
+                            16'd199: f_cum_qty[23:16] <= payload_data;
+                            16'd200: f_cum_qty[31:24] <= payload_data;
+                            16'd213: f_leaves_qty[7:0] <= payload_data;
+                            16'd214: f_leaves_qty[15:8] <= payload_data;
+                            16'd215: f_leaves_qty[23:16] <= payload_data;
+                            16'd216: f_leaves_qty[31:24] <= payload_data;
+                            16'd223: f_side <= payload_data;
+                            16'd227: f_aggressor <= payload_data;
+                            default: ;
+                        endcase
+                    end
+ 
+                    if (template_id == 16'd531) begin
+                        if (bpos >= 16'd72 && bpos < 16'd92)
+                            f_clord_id[{clord_off_72[4:0], 3'b0} +: 8] <= payload_data;
+                        case (bpos)
+                            16'd100: f_order_id[7:0] <= payload_data;
+                            16'd101: f_order_id[15:8] <= payload_data;
+                            16'd102: f_order_id[23:16] <= payload_data;
+                            16'd103: f_order_id[31:24] <= payload_data;
+                            16'd104: f_order_id[39:32] <= payload_data;
+                            16'd105: f_order_id[47:40] <= payload_data;
+                            16'd106: f_order_id[55:48] <= payload_data;
+                            16'd107: f_order_id[63:56] <= payload_data;
+                            16'd108: f_price[7:0] <= payload_data;
+                            16'd109: f_price[15:8] <= payload_data;
+                            16'd110: f_price[23:16] <= payload_data;
+                            16'd111: f_price[31:24] <= payload_data;
+                            16'd112: f_price[39:32] <= payload_data;
+                            16'd113: f_price[47:40] <= payload_data;
+                            16'd114: f_price[55:48] <= payload_data;
+                            16'd115: f_price[63:56] <= payload_data;
+                            16'd177: f_cum_qty[7:0] <= payload_data;
+                            16'd178: f_cum_qty[15:8] <= payload_data;
+                            16'd179: f_cum_qty[23:16] <= payload_data;
+                            16'd180: f_cum_qty[31:24] <= payload_data;
+                            16'd181: f_leaves_qty[7:0] <= payload_data;
+                            16'd182: f_leaves_qty[15:8] <= payload_data;
+                            16'd183: f_leaves_qty[23:16] <= payload_data;
+                            16'd184: f_leaves_qty[31:24] <= payload_data;
+                            16'd198: f_side <= payload_data;
+                            default: ;
+                        endcase
+                    end
+ 
+                    if (template_id == 16'd534) begin
+                        if (bpos >= 16'd72 && bpos < 16'd92)
+                            f_clord_id[{clord_off_72[4:0], 3'b0} +: 8] <= payload_data;
+                        case (bpos)
+                            16'd100: f_order_id[7:0] <= payload_data;
+                            16'd101: f_order_id[15:8] <= payload_data;
+                            16'd102: f_order_id[23:16] <= payload_data;
+                            16'd103: f_order_id[31:24] <= payload_data;
+                            16'd104: f_order_id[39:32] <= payload_data;
+                            16'd105: f_order_id[47:40] <= payload_data;
+                            16'd106: f_order_id[55:48] <= payload_data;
+                            16'd107: f_order_id[63:56] <= payload_data;
+                            16'd177: f_cum_qty[7:0] <= payload_data;
+                            16'd178: f_cum_qty[15:8] <= payload_data;
+                            16'd179: f_cum_qty[23:16] <= payload_data;
+                            16'd180: f_cum_qty[31:24] <= payload_data;
+                            16'd194: f_side <= payload_data;
+                            16'd199: f_exec_restatement_reason <= payload_data;
+                            default: ;
+                        endcase
+                    end
+ 
+                    if (template_id == 16'd535) begin //ocr
+                        if (bpos >= 16'd328 && bpos < 16'd348)
+                            f_ocr_clord_id[{clord_off_328[4:0], 3'b0} +: 8] <= payload_data;
+                        case (bpos)
+                            16'd356: f_ocr_order_id[7:0] <= payload_data;
+                            16'd357: f_ocr_order_id[15:8] <= payload_data;
+                            16'd358: f_ocr_order_id[23:16] <= payload_data;
+                            16'd359: f_ocr_order_id[31:24] <= payload_data;
+                            16'd360: f_ocr_order_id[39:32] <= payload_data;
+                            16'd361: f_ocr_order_id[47:40] <= payload_data;
+                            16'd362: f_ocr_order_id[55:48] <= payload_data;
+                            16'd363: f_ocr_order_id[63:56] <= payload_data;
+                            16'd393: f_ocr_cxl_rej_reason[7:0] <= payload_data;
+                            16'd394: f_ocr_cxl_rej_reason[15:8] <= payload_data;
+                            default: ;
+                        endcase
+                    end
+ 
+                    if (template_id == 16'd521) begin
+                        if (bpos >= 16'd12 && bpos < 16'd268)
+                            f_biz_text[{biz_text_off[7:0], 3'b0} +: 8] <= payload_data;
+                        case (bpos)
+                            16'd323: f_biz_rej_reason[7:0] <= payload_data;
+                            16'd324: f_biz_rej_reason[15:8] <= payload_data;
+                            default: ;
+                        endcase
+                    end
+
+                    pos <= pos + 16'd1;
+ 
+                    if (bpos == block_length - 16'd1) begin
+                        if (template_id == 16'd521 || template_id == 16'd522 || template_id == 16'd523 || template_id == 16'd524 || 
+                            template_id == 16'd525 || template_id == 16'd531 || template_id == 16'd534 || template_id == 16'd535) begin
+                            if (expected_seq_valid && f_seq_num != expected_seq) begin
+                                gap_pending <= 1;
+                                gap_from_latch <= expected_seq;
+                                gap_count_latch <= f_seq_num - expected_seq;
+                            end
+                            expected_seq <= f_seq_num + 32'd1;
+                        end
+ 
+                        dispatch_pending <= 1;
+                        dispatch_tid <= template_id;
+ 
+                        begin
+                            logic [15:0] skip;
+                            skip = sofh_total_len - 16'd12 - block_length;
+                            if (skip > 0) begin
+                                block_length <= skip; 
+                                pos <= 0;
+                                state <= s_skip;
+                            end else begin
+                                pos <= 0;
+                                state <= s_idle;
+                            end
+                        end
+                    end
                 end
                 
                 s_skip: begin
