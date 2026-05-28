@@ -824,6 +824,94 @@ logic [31:0] uart_price_latch;
 logic uart_side_latch;
 logic uart_busy; 
 
+//always_ff @(posedge tx_clk) begin
+//    if (rst) begin
+//        uart_data <= 0;
+//        uart_ready <= 0;
+//        uart_seq <= 0;
+//        uart_state <= UART_IDLE;
+//        uart_price_latch <= 0;
+//        uart_side_latch <= 0;
+//    end else begin
+//        uart_ready <= 0;
+//        case (uart_state)
+//            UART_IDLE: begin
+//                if (mm_fill_valid) begin
+//                    uart_price_latch <= mm_fill_price[63:32]; //upper 32 bits
+//                    uart_side_latch <= mm_fill_side;
+//                    uart_seq <= 0;
+//                    uart_state <= UART_FILL;
+//                end else if (hb_tick) begin
+//                    uart_seq <= 0;
+//                    uart_state <= UART_STATUS;
+//                end
+//            end
+
+//            UART_FILL: begin
+//                if (!uart_busy) begin
+//                    case (uart_seq)
+//                        4'd0: uart_data <= uart_side_latch ? 8'h53 : 8'h42;
+//                        4'd1: uart_data <= hex_char(uart_price_latch[31:28]);
+//                        4'd2: uart_data <= hex_char(uart_price_latch[27:24]);
+//                        4'd3: uart_data <= hex_char(uart_price_latch[23:20]);
+//                        4'd4: uart_data <= hex_char(uart_price_latch[19:16]);
+//                        4'd5: uart_data <= hex_char(uart_price_latch[15:12]);
+//                        4'd6: uart_data <= hex_char(uart_price_latch[11:8]);
+//                        4'd7: uart_data <= hex_char(uart_price_latch[7:4]);
+//                        4'd8: uart_data <= hex_char(uart_price_latch[3:0]);
+//                        4'd9: uart_data <= 8'h0A;
+//                        default: uart_data <= 8'h0A;
+//                    endcase
+//                    uart_ready <= 1;
+//                    if (uart_seq >= 4'd9) begin
+//                        uart_seq <= 0;
+//                        uart_state <= UART_IDLE;
+//                    end else begin
+//                        uart_seq <= uart_seq + 1;
+//                    end
+//                end
+//            end
+            
+//            UART_STATUS: begin
+//                if (!uart_busy) begin
+//                    case (uart_seq)
+//                        4'd0: uart_data <= 8'h53;
+//                        4'd1: begin
+//                            case ({ob_gap_detected, session_error_tx, ob_book_valid, sess_established})
+//                                4'h0: uart_data <= 8'h30;
+//                                4'h1: uart_data <= 8'h31;
+//                                4'h2: uart_data <= 8'h32;
+//                                4'h3: uart_data <= 8'h33;
+//                                4'h4: uart_data <= 8'h34;
+//                                4'h5: uart_data <= 8'h35;
+//                                4'h6: uart_data <= 8'h36;
+//                                4'h7: uart_data <= 8'h37;
+//                                4'h8: uart_data <= 8'h38;
+//                                4'h9: uart_data <= 8'h39;
+//                                4'hA: uart_data <= 8'h41;
+//                                4'hB: uart_data <= 8'h42;
+//                                4'hC: uart_data <= 8'h43;
+//                                4'hD: uart_data <= 8'h44;
+//                                4'hE: uart_data <= 8'h45;
+//                                4'hF: uart_data <= 8'h46;
+//                            endcase
+//                        end
+//                        4'd2: uart_data <= 8'h0A;
+//                        default: uart_data <= 8'h0A;
+//                    endcase
+//                    uart_ready <= 1;
+//                    if (uart_seq >= 4'd2) begin
+//                        uart_seq <= 0;
+//                        uart_state <= UART_IDLE;
+//                    end else begin
+//                        uart_seq <= uart_seq + 1;
+//                    end
+//                end
+//            end
+//        endcase
+//    end
+//end
+
 always_ff @(posedge tx_clk) begin
     if (rst) begin
         uart_data <= 0;
@@ -836,70 +924,20 @@ always_ff @(posedge tx_clk) begin
         uart_ready <= 0;
         case (uart_state)
             UART_IDLE: begin
-                if (mm_fill_valid) begin
-                    uart_price_latch <= mm_fill_price[63:32]; //upper 32 bits
-                    uart_side_latch <= mm_fill_side;
-                    uart_seq <= 0;
-                    uart_state <= UART_FILL;
-                end else if (hb_tick) begin
+                if (hb_tick) begin
                     uart_seq <= 0;
                     uart_state <= UART_STATUS;
                 end
             end
-
-            UART_FILL: begin
-                if (!uart_busy) begin
-                    case (uart_seq)
-                        4'd0: uart_data <= uart_side_latch ? 8'h53 : 8'h42;
-                        4'd1: uart_data <= hex_char(uart_price_latch[31:28]);
-                        4'd2: uart_data <= hex_char(uart_price_latch[27:24]);
-                        4'd3: uart_data <= hex_char(uart_price_latch[23:20]);
-                        4'd4: uart_data <= hex_char(uart_price_latch[19:16]);
-                        4'd5: uart_data <= hex_char(uart_price_latch[15:12]);
-                        4'd6: uart_data <= hex_char(uart_price_latch[11:8]);
-                        4'd7: uart_data <= hex_char(uart_price_latch[7:4]);
-                        4'd8: uart_data <= hex_char(uart_price_latch[3:0]);
-                        4'd9: uart_data <= 8'h0A;
-                        default: uart_data <= 8'h0A;
-                    endcase
-                    uart_ready <= 1;
-                    if (uart_seq >= 4'd9) begin
-                        uart_seq <= 0;
-                        uart_state <= UART_IDLE;
-                    end else begin
-                        uart_seq <= uart_seq + 1;
-                    end
-                end
-            end
-            
             UART_STATUS: begin
                 if (!uart_busy) begin
+                    uart_ready <= 1;
                     case (uart_seq)
-                        4'd0: uart_data <= 8'h53;
-                        4'd1: begin
-                            case ({ob_gap_detected, session_error_tx, ob_book_valid, sess_established})
-                                4'h0: uart_data <= 8'h30;
-                                4'h1: uart_data <= 8'h31;
-                                4'h2: uart_data <= 8'h32;
-                                4'h3: uart_data <= 8'h33;
-                                4'h4: uart_data <= 8'h34;
-                                4'h5: uart_data <= 8'h35;
-                                4'h6: uart_data <= 8'h36;
-                                4'h7: uart_data <= 8'h37;
-                                4'h8: uart_data <= 8'h38;
-                                4'h9: uart_data <= 8'h39;
-                                4'hA: uart_data <= 8'h41;
-                                4'hB: uart_data <= 8'h42;
-                                4'hC: uart_data <= 8'h43;
-                                4'hD: uart_data <= 8'h44;
-                                4'hE: uart_data <= 8'h45;
-                                4'hF: uart_data <= 8'h46;
-                            endcase
-                        end
-                        4'd2: uart_data <= 8'h0A;
+                        4'd0: uart_data <= 8'h41; //'A'
+                        4'd1: uart_data <= 8'h42; //'B'
+                        4'd2: uart_data <= 8'h43; //'C'
                         default: uart_data <= 8'h0A;
                     endcase
-                    uart_ready <= 1;
                     if (uart_seq >= 4'd2) begin
                         uart_seq <= 0;
                         uart_state <= UART_IDLE;
@@ -908,9 +946,11 @@ always_ff @(posedge tx_clk) begin
                     end
                 end
             end
+            default: uart_state <= UART_IDLE;
         endcase
     end
 end
+
 uarttx u_uarttx (
     .clk(tx_clk),
     .rst(rst),
