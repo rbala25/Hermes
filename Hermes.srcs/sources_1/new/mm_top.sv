@@ -190,4 +190,103 @@ logic [63:0] ilrx_order_id_out;
 logic [15:0] ilrx_biz_rej_reason;
 logic [2047:0] ilrx_biz_text;
 
+
+
+
+localparam MD2_FIFO_DEPTH = 16;
+localparam MD2_FIFO_AW = $clog2(MD2_FIFO_DEPTH);
+localparam MD2_WIDTH = 292;
+ 
+logic [MD2_WIDTH-1:0] md2_fifo_mem [0:MD2_FIFO_DEPTH-1];
+logic [MD2_FIFO_AW-1:0] md2_wr_ptr;
+logic [MD2_FIFO_AW-1:0] md2_rd_ptr;
+ 
+logic [MD2_FIFO_AW-1:0] md2_wr_ptr_meta, md2_wr_ptr_tx;
+always_ff @(posedge tx_clk) begin //metastability
+    if (rst) begin
+        md2_wr_ptr_meta <= 0;
+        md2_wr_ptr_tx <= 0;
+    end else begin
+        md2_wr_ptr_meta <= md2_wr_ptr;
+        md2_wr_ptr_tx <= md2_wr_ptr_meta;
+    end
+end
+ 
+logic md2_fifo_not_empty;
+assign md2_fifo_not_empty = (md2_rd_ptr != md2_wr_ptr_tx);
+ 
+always_ff @(posedge rx_clk) begin
+    if (rst) begin
+        md2_wr_ptr <= 0;
+    end else if (ob_book_valid && (mdp_entry_valid || mdp_trade_valid)) begin //check condition
+        md2_fifo_mem[md2_wr_ptr] <= {
+            ob_book_valid,
+            ob_best_bid_price,
+            ob_best_bid_size,
+            ob_best_ask_price,
+            ob_best_ask_size,
+            mdp_trade_valid,
+            mdp_trade_price,
+            mdp_trade_size,
+            mdp_trade_aggressor
+        };
+        md2_wr_ptr <= md2_wr_ptr + 1;
+    end
+end
+ 
+logic [MD2_WIDTH-1:0] md2_fifo_rdata;
+assign md2_fifo_rdata = md2_fifo_mem[md2_rd_ptr];
+ 
+logic [63:0] mm_best_bid_price_w;
+logic [31:0] mm_best_bid_size_w;
+logic [63:0] mm_best_ask_price_w;
+logic [31:0] mm_best_ask_size_w;
+logic mm_book_valid_w;
+logic mm_trade_valid_w;
+logic [63:0] mm_trade_price_w;
+logic [31:0] mm_trade_size_w;
+logic [1:0] mm_trade_aggressor_w;
+ 
+assign {mm_book_valid_w, mm_best_bid_price_w, mm_best_bid_size_w, mm_best_ask_price_w, mm_best_ask_size_w,
+        mm_trade_valid_w, mm_trade_price_w, mm_trade_size_w, mm_trade_aggressor_w} = md2_fifo_rdata;
+ 
+logic mm_book_valid_r;
+logic [63:0] mm_best_bid_price_r;
+logic [31:0] mm_best_bid_size_r;
+logic [63:0] mm_best_ask_price_r;
+logic [31:0] mm_best_ask_size_r;
+logic mm_trade_valid_r;
+logic [63:0] mm_trade_price_r;
+logic [31:0] mm_trade_size_r;
+logic [1:0] mm_trade_aggressor_r;
+ 
+always_ff @(posedge tx_clk) begin
+    if (rst) begin
+        md2_rd_ptr <= 0;
+        mm_book_valid_r <= 0;
+        mm_best_bid_price_r <= 0;
+        mm_best_bid_size_r <= 0;
+        mm_best_ask_price_r <= 0;
+        mm_best_ask_size_r <= 0;
+        mm_trade_valid_r <= 0;
+        mm_trade_price_r <= 0;
+        mm_trade_size_r <= 0;
+        mm_trade_aggressor_r <= 0;
+    end else if (md2_fifo_not_empty) begin
+        mm_book_valid_r <= mm_book_valid_w;
+        mm_best_bid_price_r <= mm_best_bid_price_w;
+        mm_best_bid_size_r <= mm_best_bid_size_w;
+        mm_best_ask_price_r <= mm_best_ask_price_w;
+        mm_best_ask_size_r <= mm_best_ask_size_w;
+        mm_trade_valid_r <= mm_trade_valid_w;
+        mm_trade_price_r <= mm_trade_price_w;
+        mm_trade_size_r <= mm_trade_size_w;
+        mm_trade_aggressor_r <= mm_trade_aggressor_w;
+        md2_rd_ptr <= md2_rd_ptr + 1;
+    end else begin
+        mm_book_valid_r <= 0;
+        mm_trade_valid_r <= 0;
+    end
+end
+
 endmodule
