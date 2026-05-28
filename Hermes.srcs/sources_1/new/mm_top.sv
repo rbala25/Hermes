@@ -83,6 +83,7 @@ always_ff @(posedge clk_100) begin
     end
 end
 assign eth_rstn = phy_rstn;
+logic link_ready;
  
 logic [7:0] mii_rx_data; //mii rx outputs
 logic mii_rx_valid;
@@ -740,26 +741,26 @@ always_ff @(posedge tx_clk) begin
         arp_start <= 0;
         icmp_tx_start <= 0;
         unique case (tx_state)
-            TX_IDLE: begin
-                if (arp_pending) begin
-                    arp_start <= 1;
-                    ethtx_start <= 1;
-                    tx_is_arp <= 1;
-                    tx_is_tcp <= 0;
-                    tx_state <= TX_WAIT;
-                end else if (tcp_pending) begin
-                    ethtx_start <= 1;
-                    tx_is_arp <= 0;
-                    tx_is_tcp <= 1;
-                    tx_state <= TX_WAIT;
-                end else if (icmp_fifo_valid_tx) begin
-                    icmp_tx_start <= 1;
-                    ethtx_start <= 1;
-                    tx_is_arp <= 0;
-                    tx_is_tcp <= 0;
-                    tx_state <= TX_WAIT;
-                end
+        TX_IDLE: begin
+            if (link_ready && arp_pending) begin
+                arp_start <= 1;
+                ethtx_start <= 1;
+                tx_is_arp <= 1;
+                tx_is_tcp <= 0;
+                tx_state <= TX_WAIT;
+            end else if (link_ready && tcp_pending) begin
+                ethtx_start <= 1;
+                tx_is_arp <= 0;
+                tx_is_tcp <= 1;
+                tx_state <= TX_WAIT;
+            end else if (link_ready && icmp_fifo_valid_tx) begin
+                icmp_tx_start <= 1;
+                ethtx_start <= 1;
+                tx_is_arp <= 0;
+                tx_is_tcp <= 0;
+                tx_state <= TX_WAIT;
             end
+        end
             TX_WAIT: begin
                 if (ethtx_done) tx_state <= TX_IDLE;
             end
@@ -972,13 +973,17 @@ uarttx u_uarttx (
 );
 
 logic mdio_done;
-mdio_init u_mdio_init (
-    .clk(clk_100),
-    .rst(rst),
-    .mdc(eth_mdc),
-    .mdio(eth_mdio),
-    .done(mdio_done)
-);
+//mdio_init u_mdio_init (
+//    .clk(clk_100),
+//    .rst(rst),
+//    .mdc(eth_mdc),
+//    .mdio(eth_mdio),
+//    .done(mdio_done)
+//);
+
+assign eth_mdc = 0;
+assign eth_mdio = 1;
+assign mdio_done = 1;
 
 mii_rx u_mii_rx (
     .rxclk(rx_clk),
@@ -1255,15 +1260,43 @@ mm_core #(
     .directional_size(mm_directional_size)
 );
  
-logic tcp_connect_sent; //send once
+//logic tcp_connect_sent; //send once
+//logic tcp_connect_pulse;
+//always_ff @(posedge tx_clk) begin
+//    if (rst) begin
+//        tcp_connect_sent <= 0;
+//        tcp_connect_pulse <= 0;
+//    end else begin
+//        tcp_connect_pulse <= 0;
+//        if (!tcp_connect_sent && !sess_established) begin
+//            tcp_connect_pulse <= 1;
+//            tcp_connect_sent <= 1;
+//        end
+//    end
+//end
+
+logic tcp_connect_sent;
 logic tcp_connect_pulse;
+logic [24:0] link_delay;
+//logic link_ready;
+
+always_ff @(posedge tx_clk) begin
+    if (rst) begin
+        link_delay <= 0;
+        link_ready <= 0;
+    end else if (!link_ready) begin
+        link_delay <= link_delay + 1;
+        if (link_delay == 25'd24999999) link_ready <= 1;
+    end
+end
+
 always_ff @(posedge tx_clk) begin
     if (rst) begin
         tcp_connect_sent <= 0;
         tcp_connect_pulse <= 0;
     end else begin
         tcp_connect_pulse <= 0;
-        if (!tcp_connect_sent && !sess_established) begin
+        if (link_ready && !tcp_connect_sent && !sess_established) begin
             tcp_connect_pulse <= 1;
             tcp_connect_sent <= 1;
         end
@@ -1453,8 +1486,8 @@ arp_handler #(
 //assign led[2] = ilrx_exec_trade; //fill received
 //assign led[3] = ob_book_valid; //book live
 assign led[0] = mdio_done; // PHY init complete
-assign led[1] = mii_rx_valid; // any RX nibbles arriving (will flicker)
+//assign led[1] = mii_rx_valid; // any RX nibbles arriving (will flicker)
+assign led[1] = tx_en;
 assign led[2] = eth_header_valid; // eth frames parsed
 assign led[3] = arp_pending; // ARP request received and queued
- 
 endmodule
