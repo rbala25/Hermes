@@ -58,7 +58,10 @@ module mm_top #(
     
     input logic clk_100,
     output logic eth_ref_clk,
-    output logic eth_rstn
+    output logic eth_rstn,
+    
+    output logic eth_mdc,
+    output logic eth_mdio   
 );
 
 logic locked;
@@ -973,6 +976,16 @@ uarttx u_uarttx (
     .tx_done(uart_tx_done),
     .tx(uart_tx)
 );
+
+logic mdio_done;
+mdio_init u_mdio_init (
+    .clk(clk_100),
+    .rst(rst),
+    .mdc(eth_mdc),
+    .mdio(eth_mdio),
+    .done(mdio_done)
+);
+
 mii_rx u_mii_rx (
     .rxclk(rx_clk),
     .rxd(rxd),
