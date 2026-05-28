@@ -42,7 +42,7 @@ module mm_top #(
     parameter logic [63:0] OFI_SCALE = 64'd25000000,
     parameter logic [31:0] OFI_THRESHOLD = 32'd10,
     parameter logic [31:0] RETRANSMIT_CYCLES = 32'd25000000,
-    parameter logic [31:0] KEEPALIVE_CYCLES = 32'd625000000,
+    parameter logic [31:0] KEEPALIVE_CYCLES = 32'd125000000, //5 sec
     parameter logic [255:0] HMAC_NEGOTIATE = 256'd0,
     parameter logic [255:0] HMAC_ESTABLISH = 256'd0
 )(
@@ -510,5 +510,31 @@ logic [7:0] tcptx_payload_data; //tcp tx to ip tx
 logic tcptx_payload_valid;
 logic tcptx_payload_ready;
 logic tcptx_done;
+
+logic tcp_start_mux; //mux for ilink and tcp session
+logic [7:0] tcp_flags_mux;
+logic [15:0] tcp_length_mux;
+logic [15:0] tcp_payload_csum_mux;
+logic [31:0] tcp_ack_num_mux;
+ 
+assign tcp_start_mux = sess_ctrl_start ? sess_ctrl_start : iltx_start;
+assign tcp_flags_mux = sess_ctrl_start ? sess_ctrl_flags : iltx_flags;
+assign tcp_length_mux = sess_ctrl_start ? sess_ctrl_tcp_length : iltx_tcp_length;
+assign tcp_payload_csum_mux = sess_ctrl_start ? sess_ctrl_payload_csum : iltx_payload_csum;
+assign tcp_ack_num_mux = sess_ctrl_start ? sess_ctrl_ack_num : 32'h0;
+ 
+assign iltx_payload_ready = sess_ctrl_start ? 1'b0 : tcptx_payload_ready; //tcp session gets priority
+logic [7:0] tcp_pld_data_mux;
+logic tcp_pld_valid_mux;
+logic tcp_pld_last_mux;
+assign tcp_pld_data_mux = sess_ctrl_start ? 8'h0 : iltx_payload_data;
+assign tcp_pld_valid_mux = sess_ctrl_start ? 1'b0 : iltx_payload_valid;
+assign tcp_pld_last_mux = sess_ctrl_start ? 1'b0 : iltx_payload_last;
+
+logic [7:0] iptx_data; //ip tx to eth tx
+logic iptx_valid;
+logic iptx_ready;
+logic iptx_start;
+logic iptx_done;
 
 endmodule
