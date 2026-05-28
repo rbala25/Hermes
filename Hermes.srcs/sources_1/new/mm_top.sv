@@ -822,44 +822,7 @@ always_ff @(posedge tx_clk) begin
                 end
             end
 
-            UART_FILL: begin
-                case (uart_seq)
-                    4'd0: uart_data <= uart_side_latch ? 8'h53 : 8'h42; //S or B
-                    4'd1: uart_data <= hex_char(uart_price_latch[31:28]);
-                    4'd2: uart_data <= hex_char(uart_price_latch[27:24]);
-                    4'd3: uart_data <= hex_char(uart_price_latch[23:20]);
-                    4'd4: uart_data <= hex_char(uart_price_latch[19:16]);
-                    4'd5: uart_data <= hex_char(uart_price_latch[15:12]);
-                    4'd6: uart_data <= hex_char(uart_price_latch[11:8]);
-                    4'd7: uart_data <= hex_char(uart_price_latch[7:4]);
-                    4'd8: uart_data <= hex_char(uart_price_latch[3:0]);
-                    4'd9: uart_data <= 8'h0A; //newline
-                    default: uart_data <= 8'h0A;
-                endcase
-                uart_ready <= 1;
-                if (uart_seq >= 4'd9) begin
-                    uart_seq <= 0;
-                    uart_state <= UART_IDLE;
-                end else begin
-                    uart_seq <= uart_seq + 1;
-                end
-            end
-
-            UART_STATUS: begin
-                case (uart_seq)
-                    4'd0: uart_data <= 8'h53; //'S' for status
-                    4'd1: uart_data <= hex_char({ob_gap_detected, session_error_tx, ob_book_valid, sess_established});
-                    4'd2: uart_data <= 8'h0A;
-                    default: uart_data <= 8'h0A;
-                endcase
-                uart_ready <= 1;
-                if (uart_seq >= 4'd2) begin
-                    uart_seq <= 0;
-                    uart_state <= UART_IDLE;
-                end else begin
-                    uart_seq <= uart_seq + 1;
-                end
-            end
+            
         endcase
     end
 end
