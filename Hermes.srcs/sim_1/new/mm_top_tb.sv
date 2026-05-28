@@ -149,4 +149,43 @@ task automatic send_ip_frame(
     send_eth_frame(dst_mac, src_mac, 16'h0800, eth_payload, ip_total_len);
 endtask
 
+task automatic send_arp_request(
+    input logic [47:0] src_mac,
+    input logic [31:0] src_ip
+);
+    logic [7:0] arp_payload [28];
+    arp_payload[0] = 8'h00;
+    arp_payload[1] = 8'h01; 
+    arp_payload[2] = 8'h08;
+    arp_payload[3] = 8'h00;
+    arp_payload[4] = 8'h06;  
+    arp_payload[5] = 8'h04;   
+    arp_payload[6] = 8'h00; arp_payload[7] = 8'h01;
+    
+    arp_payload[8]  = src_mac[47:40];
+    arp_payload[9]  = src_mac[39:32];
+    arp_payload[10] = src_mac[31:24];
+    arp_payload[11] = src_mac[23:16];
+    arp_payload[12] = src_mac[15:8];
+    arp_payload[13] = src_mac[7:0];
+
+    arp_payload[14] = src_ip[31:24];
+    arp_payload[15] = src_ip[23:16];
+    arp_payload[16] = src_ip[15:8];
+    arp_payload[17] = src_ip[7:0];
+
+    arp_payload[18] = 0; //unknown dest mac
+    arp_payload[19] = 0; 
+    arp_payload[20] = 0;
+    arp_payload[21] = 0; 
+    arp_payload[22] = 0; 
+    arp_payload[23] = 0;
+
+    arp_payload[24] = 8'hC0; 
+    arp_payload[25] = 8'hA8; 
+    arp_payload[26] = 8'h01;
+    arp_payload[27] = 8'h64; 
+    send_eth_frame(48'hFFFFFFFFFFFF, src_mac, 16'h0806, arp_payload, 28);
+endtask
+
 endmodule
