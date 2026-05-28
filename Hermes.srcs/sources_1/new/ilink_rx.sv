@@ -348,6 +348,34 @@ always_ff @(posedge clk) begin
                 default: ;
             endcase
         end
+        
+        payload_ready <= 1;
+        
+        if(payload_valid) begin
+            unique case (state)
+                s_idle: begin
+                
+                end
+                
+                s_sofh: begin
+                
+                end
+                
+                s_sbe_hdr: begin
+                
+                end
+                
+                s_body: begin
+                
+                end
+                
+                s_skip: begin
+                
+                end
+                
+                default: state <= s_idle;
+            endcase
+        end
     end
 end
 endmodule
