@@ -756,7 +756,7 @@ always_ff @(posedge tx_clk) begin
         baud_tick <= 0;
     end else begin
         baud_tick <= 0;
-        if (baud_cnt >= 8'd216) begin
+        if (baud_cnt >= 8'd216) begin //baud 115200
             baud_tick <= 1;
             baud_cnt <= 0;
         end else begin
@@ -765,29 +765,100 @@ always_ff @(posedge tx_clk) begin
     end
 end
 
+logic [24:0] hb_cnt; //1s uart heartbeat, fill has priority
+logic hb_tick;
+always_ff @(posedge tx_clk) begin
+    if (rst) begin
+        hb_cnt <= 0;
+        hb_tick <= 0;
+    end else begin
+        hb_tick <= 0;
+        if (hb_cnt >= 25'd24999999) begin
+            hb_tick <= 1;
+            hb_cnt <= 0;
+        end else begin
+            hb_cnt <= hb_cnt + 1;
+        end
+    end
+end
+
+function automatic logic [7:0] hex_char(input logic [3:0] nibble);
+    return (nibble < 4'd10) ? (8'h30 + {4'h0, nibble}) : (8'h41 + {4'h0, nibble} - 8'd10);
+endfunction
+
+typedef enum logic [1:0] { //uart state machine
+    UART_IDLE,
+    UART_FILL,
+    UART_STATUS
+} uart_state_t;
+uart_state_t uart_state;
+
 logic [7:0] uart_data;
 logic uart_ready;
-logic [1:0] uart_seq;
+logic [3:0] uart_seq;
+logic [31:0] uart_price_latch;
+logic uart_side_latch;
 
 always_ff @(posedge tx_clk) begin
     if (rst) begin
         uart_data <= 0;
         uart_ready <= 0;
         uart_seq <= 0;
+        uart_state <= UART_IDLE;
+        uart_price_latch <= 0;
+        uart_side_latch <= 0;
     end else begin
         uart_ready <= 0;
-        case (uart_seq)
-            2'd0: begin
+        case (uart_state)
+            UART_IDLE: begin
                 if (mm_fill_valid) begin
-                    uart_data <= mm_fill_side ? 8'h53 : 8'h42; 
-                    uart_ready <= 1;
-                    uart_seq <= 2'd1;
+                    uart_price_latch <= mm_fill_price[63:32]; //upper 32 bits
+                    uart_side_latch <= mm_fill_side;
+                    uart_seq <= 0;
+                    uart_state <= UART_FILL;
+                end else if (hb_tick) begin
+                    uart_seq <= 0;
+                    uart_state <= UART_STATUS;
                 end
             end
-            2'd1: begin
-                uart_data <= 8'h0A; 
+
+            UART_FILL: begin
+                case (uart_seq)
+                    4'd0: uart_data <= uart_side_latch ? 8'h53 : 8'h42; //S or B
+                    4'd1: uart_data <= hex_char(uart_price_latch[31:28]);
+                    4'd2: uart_data <= hex_char(uart_price_latch[27:24]);
+                    4'd3: uart_data <= hex_char(uart_price_latch[23:20]);
+                    4'd4: uart_data <= hex_char(uart_price_latch[19:16]);
+                    4'd5: uart_data <= hex_char(uart_price_latch[15:12]);
+                    4'd6: uart_data <= hex_char(uart_price_latch[11:8]);
+                    4'd7: uart_data <= hex_char(uart_price_latch[7:4]);
+                    4'd8: uart_data <= hex_char(uart_price_latch[3:0]);
+                    4'd9: uart_data <= 8'h0A; //newline
+                    default: uart_data <= 8'h0A;
+                endcase
                 uart_ready <= 1;
-                uart_seq <= 2'd0;
+                if (uart_seq >= 4'd9) begin
+                    uart_seq <= 0;
+                    uart_state <= UART_IDLE;
+                end else begin
+                    uart_seq <= uart_seq + 1;
+                end
+            end
+
+            UART_STATUS: begin
+                case (uart_seq)
+                    4'd0: uart_data <= 8'h53; //'S' for status
+                    4'd1: uart_data <= hex_char({ob_gap_detected, session_error_tx, ob_book_valid, sess_established});
+                    4'd2: uart_data <= 8'h0A;
+                    default: uart_data <= 8'h0A;
+                endcase
+                uart_ready <= 1;
+                if (uart_seq >= 4'd2) begin
+                    uart_seq <= 0;
+                    uart_state <= UART_IDLE;
+                end else begin
+                    uart_seq <= uart_seq + 1;
+                end
             end
         endcase
     end
