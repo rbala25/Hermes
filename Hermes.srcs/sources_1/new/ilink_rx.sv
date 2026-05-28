@@ -398,7 +398,35 @@ always_ff @(posedge clk) begin
                 end
                 
                 s_sbe_hdr: begin
-                
+                    case (pos)
+                        16'd4: block_length[7:0] <= payload_data;
+                        16'd5: block_length[15:8] <= payload_data;
+                        16'd6: template_id[7:0] <= payload_data;
+                        16'd7: template_id[15:8] <= payload_data;
+                        16'd11: begin
+                            pos <= pos + 16'd1;
+                            if (block_length == 0) begin //dispatch now
+                                dispatch_pending <= 1;
+                                dispatch_tid <= template_id;
+                                begin
+                                    logic [15:0] rem;
+                                    rem = sofh_total_len - 16'd12;
+                                    if (rem > 0) begin //skip rest
+                                        state <= s_skip;
+                                        block_length <= rem;
+                                    end else begin
+                                        pos <= 0;
+                                        state <= s_idle;
+                                    end
+                                end
+                            end else begin
+                                state <= s_body;
+                            end
+                        end
+                        default: ;
+                    endcase
+                    if (pos != 16'd11)
+                        pos <= pos + 16'd1;
                 end
                 
                 s_body: begin
@@ -406,7 +434,12 @@ always_ff @(posedge clk) begin
                 end
                 
                 s_skip: begin
-                
+                    if (block_length == 16'd1) begin
+                        pos <= 0;
+                        state <= s_idle;
+                    end else begin
+                        block_length <= block_length - 16'd1;
+                    end
                 end
                 
                 default: state <= s_idle;
