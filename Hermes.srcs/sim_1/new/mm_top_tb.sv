@@ -188,4 +188,72 @@ task automatic send_arp_request(
     send_eth_frame(48'hFFFFFFFFFFFF, src_mac, 16'h0806, arp_payload, 28);
 endtask
 
+task automatic send_ping(
+    input logic [47:0] src_mac,
+    input logic [31:0] src_ip,
+    input logic [15:0] identifier,
+    input logic [15:0] seq
+);
+    logic [7:0] icmp [16];
+    logic [7:0] ip_payload [];
+    ip_payload = new[16];
+ 
+    icmp[0] = 8'h08; 
+    icmp[1] = 8'h00; 
+    icmp[2] = 8'h00; 
+    icmp[3] = 8'h00;
+    icmp[4] = identifier[15:8];
+    icmp[5] = identifier[7:0];
+    icmp[6] = seq[15:8];
+    icmp[7] = seq[7:0];
+    icmp[8]  = 8'hDE; icmp[9]  = 8'hAD;
+    icmp[10] = 8'hBE; icmp[11] = 8'hEF;
+    icmp[12] = 8'hCA; icmp[13] = 8'hFE;
+    icmp[14] = 8'hBA; icmp[15] = 8'hBE;
+ 
+    for (int i = 0; i < 16; i++) ip_payload[i] = icmp[i];
+    send_ip_frame(48'h00183E03E41B, src_mac, src_ip, 32'hC0A80164, 8'h01, ip_payload, 16);
+endtask
+
+task automatic send_tcp_synack(
+    input logic [47:0] src_mac,
+    input logic [31:0] src_ip,
+    input logic [31:0] seq_num,
+    input logic [31:0] ack_num
+);
+    logic [7:0] tcp [20];
+    logic [7:0] ip_payload [];
+    ip_payload = new[20];
+ 
+    tcp[0] = 16'd10000 >> 8; //src port
+    tcp[1] = 16'd10000 & 8'hFF;
+    tcp[2] = 16'd12345 >> 8; 
+    tcp[3] = 16'd12345 & 8'hFF;
+    tcp[4] = seq_num[31:24]; 
+    tcp[5] = seq_num[23:16];
+    tcp[6] = seq_num[15:8];  
+    tcp[7] = seq_num[7:0];
+    tcp[8] = ack_num[31:24]; 
+    tcp[9] = ack_num[23:16];
+    tcp[10] = ack_num[15:8]; 
+    tcp[11] = ack_num[7:0];
+    tcp[12] = 8'h50; 
+    tcp[13] = 8'h12; //syn ack
+    tcp[14] = 8'hFF; tcp[15] = 8'hFF; 
+    tcp[16] = 8'h00; tcp[17] = 8'h00; 
+    tcp[18] = 8'h00; tcp[19] = 8'h00; 
+ 
+    for (int i = 0; i < 20; i++) ip_payload[i] = tcp[i];
+    send_ip_frame(48'h00183E03E41B, src_mac, src_ip, 32'hC0A80164, 8'h06, ip_payload, 20);
+endtask
+
+integer tx_frame_count = 0;
+always @(posedge tx_clk) begin
+    if (tx_en) begin
+        @(negedge tx_en);
+        tx_frame_count++;
+        $display("t=%0t TX frame #%0d sent", $time, tx_frame_count);
+    end
+end
+
 endmodule
