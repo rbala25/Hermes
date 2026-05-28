@@ -765,6 +765,42 @@ always_ff @(posedge tx_clk) begin
     end
 end
 
+logic [7:0] uart_data;
+logic uart_ready;
+logic [1:0] uart_seq;
+
+always_ff @(posedge tx_clk) begin
+    if (rst) begin
+        uart_data <= 0;
+        uart_ready <= 0;
+        uart_seq <= 0;
+    end else begin
+        uart_ready <= 0;
+        case (uart_seq)
+            2'd0: begin
+                if (mm_fill_valid) begin
+                    uart_data <= mm_fill_side ? 8'h53 : 8'h42; 
+                    uart_ready <= 1;
+                    uart_seq <= 2'd1;
+                end
+            end
+            2'd1: begin
+                uart_data <= 8'h0A; 
+                uart_ready <= 1;
+                uart_seq <= 2'd0;
+            end
+        endcase
+    end
+end
+
+uarttx u_uarttx (
+    .clk(tx_clk),
+    .rst(rst),
+    .baud(baud_tick),
+    .data(uart_data),
+    .ready(uart_ready),
+    .tx(uart_tx)
+);
  
 mii_rx u_mii_rx (
     .rxclk(rx_clk),
