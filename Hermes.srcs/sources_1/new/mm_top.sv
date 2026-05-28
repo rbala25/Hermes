@@ -1,13 +1,13 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
-// Engineer: 
+// Engineer: Rishi Bala
 // 
 // Create Date: 05/28/2026 12:25:43 AM
 // Design Name: 
 // Module Name: mm_top
 // Project Name: 
-// Target Devices: 
+// Target Devices: Arty A7 35t
 // Tool Versions: 
 // Description: 
 // 
@@ -42,7 +42,7 @@ module mm_top #(
     parameter logic [63:0] OFI_SCALE = 64'd25000000,
     parameter logic [31:0] OFI_THRESHOLD = 32'd10,
     parameter logic [31:0] RETRANSMIT_CYCLES = 32'd25000000,
-    parameter logic [31:0] KEEPALIVE_CYCLES = 32'd125000000, //5 sec
+    parameter logic [31:0] KEEPALIVE_CYCLES = 32'd125000000,
     parameter logic [255:0] HMAC_NEGOTIATE = 256'd0,
     parameter logic [255:0] HMAC_ESTABLISH = 256'd0
 )(
@@ -56,11 +56,11 @@ module mm_top #(
     output logic uart_tx,
     output logic [3:0] led
 );
-
+ 
 logic [7:0] mii_rx_data; //mii rx outputs
 logic mii_rx_valid;
 logic mii_rx_frame_active;
-
+ 
 logic [47:0] eth_dest_mac; //eth parser outputs
 logic [47:0] eth_src_mac;
 logic [15:0] eth_ether_type;
@@ -69,7 +69,7 @@ logic [7:0] eth_payload_data;
 logic eth_payload_valid;
 logic eth_frame_done;
 logic eth_error;
-
+ 
 logic [3:0] ip_version; //ip parser outputs
 logic [3:0] ip_ihl;
 logic [7:0] ip_dscp;
@@ -99,8 +99,8 @@ logic udp_checksum_val;
 logic [7:0] udp_payload;
 logic udp_payload_valid;
 logic udp_payload_done;
-logic udp_error; 
-
+logic udp_error;
+ 
 logic [31:0] mdp_seq_num; //mdp parser outputs
 logic [63:0] mdp_sending_time;
 logic mdp_pkt_valid;
@@ -117,7 +117,7 @@ logic [63:0] mdp_trade_price;
 logic [31:0] mdp_trade_size;
 logic [1:0] mdp_trade_aggressor;
 logic mdp_trade_valid;
-
+ 
 logic [63:0] ob_best_bid_price; //order book outputs
 logic [31:0] ob_best_bid_size;
 logic [63:0] ob_best_ask_price;
@@ -128,7 +128,7 @@ logic [3:0] ob_rd_level;
 logic ob_rd_side;
 logic [63:0] ob_rd_price;
 logic [31:0] ob_rd_size;
-
+ 
 logic tcprx_data_in_ready; //tcp rx outputs
 logic [15:0] tcprx_src_port;
 logic [15:0] tcprx_dst_port;
@@ -145,16 +145,121 @@ logic tcprx_rx_ack;
 logic tcprx_rx_fin;
 logic tcprx_rx_rst;
 logic tcprx_csum_error;
-
+ 
 logic [15:0] tcp_segment_length;
-assign tcp_segment_length = ip_total_len - {10'b0, ip_ihl, 2'b00}; //ip_total_len - ip_ihl*4
+assign tcp_segment_length = ip_total_len - {10'b0, ip_ihl, 2'b00};
  
 logic tcp_ip_payload_valid;
 assign tcp_ip_payload_valid = ip_payload_valid && (ip_protocol == 8'h06);
  
 logic tcp_ip_payload_done_rx;
 assign tcp_ip_payload_done_rx = ip_payload_done && (ip_protocol == 8'h06);
-
+ 
+logic [7:0] icmp_type; //icmp parser outputs
+logic [7:0] icmp_code;
+logic [15:0] icmp_checksum_rx;
+logic [15:0] icmp_identifier;
+logic [15:0] icmp_seq_num;
+logic icmp_header_valid;
+logic icmp_checksum_val;
+logic [7:0] icmp_payload_data;
+logic icmp_payload_valid;
+logic icmp_payload_done;
+logic icmp_error;
+ 
+logic [47:0] rep_dst_mac; //icmp reply params latched on ping arrival
+logic [31:0] rep_dst_ip;
+logic [15:0] rep_identifier;
+logic [15:0] rep_seq;
+logic [15:0] rep_total_len;
+logic [15:0] rep_ip_id;
+logic [15:0] rep_icmp_checksum_rx;
+ 
+always_ff @(posedge rx_clk) begin
+    if (rst) begin
+        rep_dst_mac <= 0;
+        rep_dst_ip <= 0;
+        rep_identifier <= 0;
+        rep_seq <= 0;
+        rep_total_len <= 0;
+        rep_ip_id <= 0;
+        rep_icmp_checksum_rx <= 0;
+    end else if (icmp_header_valid && icmp_type == 8'h08 && icmp_code == 8'h00) begin
+        rep_dst_mac <= eth_src_mac;
+        rep_dst_ip <= ip_src;
+        rep_identifier <= icmp_identifier;
+        rep_seq <= icmp_seq_num;
+        rep_total_len <= ip_total_len;
+        rep_ip_id <= ip_id;
+        rep_icmp_checksum_rx <= icmp_checksum_rx;
+    end
+end
+ 
+localparam ICMP_FIFO_DEPTH = 256;
+localparam ICMP_FIFO_AW = $clog2(ICMP_FIFO_DEPTH);
+logic [7:0] icmp_fifo_mem [0:ICMP_FIFO_DEPTH-1];
+logic [ICMP_FIFO_AW-1:0] icmp_fifo_wr_ptr;
+logic [ICMP_FIFO_AW-1:0] icmp_fifo_rd_ptr;
+ 
+logic [ICMP_FIFO_AW-1:0] icmp_wr_snap_meta, icmp_wr_snap_tx;
+always_ff @(posedge tx_clk) begin
+    if (rst) begin
+        icmp_wr_snap_meta <= 0;
+        icmp_wr_snap_tx <= 0;
+    end else begin
+        icmp_wr_snap_meta <= icmp_fifo_wr_ptr;
+        icmp_wr_snap_tx <= icmp_wr_snap_meta;
+    end
+end
+ 
+logic icmp_fifo_valid_tx;
+logic icmp_fifo_ready;
+assign icmp_fifo_valid_tx = (icmp_fifo_rd_ptr != icmp_wr_snap_tx);
+ 
+logic icmp_fifo_rst_wr;
+logic icmp_fifo_rst_meta, icmp_fifo_rst_tx, icmp_fifo_rst_tx_r;
+ 
+always_ff @(posedge rx_clk) begin
+    if (rst) icmp_fifo_rst_wr <= 0;
+    else icmp_fifo_rst_wr <= (icmp_header_valid && icmp_type == 8'h08 && icmp_code == 8'h00);
+end
+ 
+always_ff @(posedge tx_clk) begin
+    if (rst) begin
+        icmp_fifo_rst_meta <= 0;
+        icmp_fifo_rst_tx <= 0;
+        icmp_fifo_rst_tx_r <= 0;
+    end else begin
+        icmp_fifo_rst_meta <= icmp_fifo_rst_wr;
+        icmp_fifo_rst_tx <= icmp_fifo_rst_meta;
+        icmp_fifo_rst_tx_r <= icmp_fifo_rst_tx;
+    end
+end
+ 
+logic icmp_fifo_rd_rst;
+assign icmp_fifo_rd_rst = icmp_fifo_rst_tx && !icmp_fifo_rst_tx_r;
+ 
+always_ff @(posedge rx_clk) begin
+    if (rst) icmp_fifo_wr_ptr <= 0;
+    else if (icmp_header_valid && icmp_type == 8'h08 && icmp_code == 8'h00) icmp_fifo_wr_ptr <= 0;
+    else if (icmp_payload_valid) begin
+        icmp_fifo_mem[icmp_fifo_wr_ptr] <= icmp_payload_data;
+        icmp_fifo_wr_ptr <= icmp_fifo_wr_ptr + 1;
+    end
+end
+ 
+always_ff @(posedge tx_clk) begin
+    if (rst) icmp_fifo_rd_ptr <= 0;
+    else if (icmp_fifo_rd_rst) icmp_fifo_rd_ptr <= 0;
+    else if (icmp_fifo_valid_tx && icmp_fifo_ready) icmp_fifo_rd_ptr <= icmp_fifo_rd_ptr + 1;
+end
+ 
+logic [7:0] ictx_data; //icmp tx to ip tx
+logic ictx_valid;
+logic ictx_ready;
+logic icmp_tx_done;
+logic [15:0] icmp_checksum_tx;
+ 
 logic ilrx_payload_ready; //ilink rx outputs
 logic ilrx_neg_response;
 logic ilrx_estab_ack;
@@ -189,10 +294,7 @@ logic [15:0] ilrx_cxl_rej_reason;
 logic [63:0] ilrx_order_id_out;
 logic [15:0] ilrx_biz_rej_reason;
 logic [2047:0] ilrx_biz_text;
-
-
-
-//mm core - tx clk :(
+ 
 localparam MD2_FIFO_DEPTH = 16;
 localparam MD2_FIFO_AW = $clog2(MD2_FIFO_DEPTH);
 localparam MD2_WIDTH = 292;
@@ -288,11 +390,7 @@ always_ff @(posedge tx_clk) begin
         mm_trade_valid_r <= 0;
     end
 end
-
-
-
-
-
+ 
 localparam FILL_FIFO_DEPTH = 16;
 localparam FILL_FIFO_AW = $clog2(FILL_FIFO_DEPTH);
 localparam FILL_WIDTH = 105;
@@ -354,17 +452,13 @@ always_ff @(posedge tx_clk) begin
         mm_fill_valid <= fill_valid_bit_w;
         mm_fill_price <= fill_price_w;
         mm_fill_size <= fill_qty_w;
-        mm_fill_side <= fill_side_w[0]; 
+        mm_fill_side <= fill_side_w[0];
         fill_rd_ptr <= fill_rd_ptr + 1;
     end else begin
         mm_fill_valid <= 0;
     end
 end
-
-
-
-
-
+ 
 logic neg_response_meta, neg_response_tx; //synchronizing response pulses for ilink tx
 always_ff @(posedge tx_clk) begin
     if (rst) begin
@@ -386,7 +480,7 @@ always_ff @(posedge tx_clk) begin
         estab_ack_tx <= estab_ack_meta;
     end
 end
-
+ 
 logic send_sequence_meta, send_sequence_tx;
 always_ff @(posedge tx_clk) begin
     if (rst) begin
@@ -424,7 +518,7 @@ always_ff @(posedge tx_clk) begin
         session_error_tx <= session_error_meta;
     end
 end
-
+ 
 logic [63:0] mm_bid_price; //mm core
 logic [31:0] mm_bid_size;
 logic [63:0] mm_ask_price;
@@ -439,10 +533,10 @@ logic [63:0] mm_directional_price;
 logic [31:0] mm_directional_size;
 logic [3:0] mm_rd_level;
 logic mm_rd_side;
-
+ 
 assign ob_rd_level = mm_rd_level; //is rd port cdc????? *
 assign ob_rd_side = mm_rd_side;
-
+ 
 logic iltx_ilink_established; //ilink tx
 logic iltx_start;
 logic [7:0] iltx_flags;
@@ -452,7 +546,7 @@ logic [7:0] iltx_payload_data;
 logic iltx_payload_valid;
 logic iltx_payload_last;
 logic iltx_payload_ready;
-
+ 
 logic sess_ctrl_start; //tcp session
 logic [7:0] sess_ctrl_flags;
 logic [31:0] sess_ctrl_ack_num;
@@ -473,44 +567,39 @@ logic [31:0] tcprx_seq_meta, tcprx_seq_tx;
  
 always_ff @(posedge tx_clk) begin
     if (rst) begin
-        tcprx_syn_meta <= 0; 
+        tcprx_syn_meta <= 0;
         tcprx_syn_tx <= 0;
-        tcprx_ack_meta <= 0; 
+        tcprx_ack_meta <= 0;
         tcprx_ack_tx <= 0;
-        tcprx_fin_meta <= 0; 
+        tcprx_fin_meta <= 0;
         tcprx_fin_tx <= 0;
-        tcprx_rst_meta <= 0; 
+        tcprx_rst_meta <= 0;
         tcprx_rst_tx <= 0;
-        tcprx_hv_meta <= 0; 
+        tcprx_hv_meta <= 0;
         tcprx_hv_tx <= 0;
-        tcprx_seq_meta <= 0; 
+        tcprx_seq_meta <= 0;
         tcprx_seq_tx <= 0;
     end else begin
-        tcprx_syn_meta <= tcprx_rx_syn; 
+        tcprx_syn_meta <= tcprx_rx_syn;
         tcprx_syn_tx <= tcprx_syn_meta;
-        
-        tcprx_ack_meta <= tcprx_rx_ack; 
+        tcprx_ack_meta <= tcprx_rx_ack;
         tcprx_ack_tx <= tcprx_ack_meta;
-        
-        tcprx_fin_meta <= tcprx_rx_fin; 
+        tcprx_fin_meta <= tcprx_rx_fin;
         tcprx_fin_tx <= tcprx_fin_meta;
-        
-        tcprx_rst_meta <= tcprx_rx_rst; 
+        tcprx_rst_meta <= tcprx_rx_rst;
         tcprx_rst_tx <= tcprx_rst_meta;
-        
-        tcprx_hv_meta <= tcprx_header_valid; 
+        tcprx_hv_meta <= tcprx_header_valid;
         tcprx_hv_tx <= tcprx_hv_meta;
-        
-        tcprx_seq_meta <= tcprx_seq_num; 
+        tcprx_seq_meta <= tcprx_seq_num;
         tcprx_seq_tx <= tcprx_seq_meta;
     end
 end
-
+ 
 logic [7:0] tcptx_payload_data; //tcp tx to ip tx
 logic tcptx_payload_valid;
 logic tcptx_payload_ready;
 logic tcptx_done;
-
+ 
 logic tcp_start_mux; //mux for ilink and tcp session
 logic [7:0] tcp_flags_mux;
 logic [15:0] tcp_length_mux;
@@ -530,13 +619,13 @@ logic tcp_pld_last_mux;
 assign tcp_pld_data_mux = sess_ctrl_start ? 8'h0 : iltx_payload_data;
 assign tcp_pld_valid_mux = sess_ctrl_start ? 1'b0 : iltx_payload_valid;
 assign tcp_pld_last_mux = sess_ctrl_start ? 1'b0 : iltx_payload_last;
-
+ 
 logic [7:0] iptx_data; //ip tx to eth tx
 logic iptx_valid;
 logic iptx_ready;
 logic iptx_start;
 logic iptx_done;
-
+ 
 logic [7:0] ethtx_data; //eth tx to mii tx
 logic ethtx_valid;
 logic ethtx_ready;
@@ -550,16 +639,99 @@ logic arp_done;
 logic [7:0] arp_payload_data;
 logic arp_payload_valid;
 logic arp_payload_ready;
-
-
-
+ 
+logic tx_is_arp;
+logic tx_is_tcp;
+ 
+logic [47:0] mux_dst_mac;
+logic [15:0] mux_ether_type;
+logic [7:0] mux_payload_data;
+logic mux_payload_valid;
+logic mux_payload_ready;
+ 
+assign mux_dst_mac = tx_is_arp ? arp_reply_dst_mac : rep_dst_mac;
+assign mux_ether_type = tx_is_arp ? 16'h0806 : 16'h0800;
+assign mux_payload_data = tx_is_arp ? arp_payload_data : iptx_data;
+assign mux_payload_valid = tx_is_arp ? arp_payload_valid : iptx_valid;
+assign iptx_ready = tx_is_arp ? 1'b0 : mux_payload_ready;
+assign arp_payload_ready = tx_is_arp ? mux_payload_ready : 1'b0;
+ 
+logic [7:0] ip_payload_mux_data;
+logic ip_payload_mux_valid;
+logic ip_payload_mux_ready;
+ 
+assign ip_payload_mux_data = tx_is_tcp ? tcptx_payload_data : ictx_data;
+assign ip_payload_mux_valid = tx_is_tcp ? tcptx_payload_valid : ictx_valid;
+assign ictx_ready = tx_is_tcp ? 1'b0 : ip_payload_mux_ready;
+ 
+logic [31:0] ip_dst_mux;
+logic [7:0] ip_protocol_mux;
+logic [15:0] ip_total_len_mux;
+logic [15:0] ip_id_mux;
+ 
+assign ip_dst_mux = tx_is_tcp ? CME_IP : rep_dst_ip;
+assign ip_protocol_mux = tx_is_tcp ? 8'h06 : 8'h01;
+assign ip_total_len_mux = tx_is_tcp ? tcp_length_mux : rep_total_len;
+assign ip_id_mux = tx_is_tcp ? 16'h0 : rep_ip_id;
+ 
+assign iptx_start = ethtx_start && !tx_is_arp;
+ 
+typedef enum logic [1:0] {
+    TX_IDLE,
+    TX_WAIT
+} tx_state_t;
+tx_state_t tx_state;
+ 
+logic icmp_tx_start;
+ 
+always_ff @(posedge tx_clk) begin
+    if (rst) begin
+        tx_state <= TX_IDLE;
+        ethtx_start <= 0;
+        arp_start <= 0;
+        icmp_tx_start <= 0;
+        tx_is_arp <= 0;
+        tx_is_tcp <= 0;
+    end else begin
+        ethtx_start <= 0;
+        arp_start <= 0;
+        icmp_tx_start <= 0;
+        unique case (tx_state)
+            TX_IDLE: begin
+                if (arp_pending) begin
+                    arp_start <= 1;
+                    ethtx_start <= 1;
+                    tx_is_arp <= 1;
+                    tx_is_tcp <= 0;
+                    tx_state <= TX_WAIT;
+                end else if (sess_ctrl_start || iltx_start) begin
+                    ethtx_start <= 1;
+                    tx_is_arp <= 0;
+                    tx_is_tcp <= 1;
+                    tx_state <= TX_WAIT;
+                end else if (icmp_fifo_valid_tx) begin
+                    icmp_tx_start <= 1;
+                    ethtx_start <= 1;
+                    tx_is_arp <= 0;
+                    tx_is_tcp <= 0;
+                    tx_state <= TX_WAIT;
+                end
+            end
+            TX_WAIT: begin
+                if (ethtx_done) tx_state <= TX_IDLE;
+            end
+        endcase
+    end
+end
+ 
 //DEBUG LEDS
 assign led[0] = session_error_tx; //ilink session error
 assign led[1] = ob_gap_detected; //order book gap
-assign led[2] = ilrx_exec_trade; //fill received 
-assign led[3] = ob_book_valid; //book live 
-
-assign uart_tx = 1'b1; // will do fr later
+assign led[2] = ilrx_exec_trade; //fill received
+assign led[3] = ob_book_valid; //book live
+ 
+assign uart_tx = 1'b1;
+ 
 mii_rx u_mii_rx (
     .rxclk(rx_clk),
     .rxd(rxd),
@@ -617,7 +789,6 @@ ip_parser u_ip_parser (
     .ip_error(ip_error)
 );
  
-
 udp_parser u_udp_parser (
     .clk(rx_clk),
     .rst(rst),
@@ -695,7 +866,29 @@ order_book u_order_book (
     .book_valid(ob_book_valid),
     .gap_detected(ob_gap_detected)
 );
-
+ 
+icmp_parser u_icmp_parser (
+    .clk(rx_clk),
+    .rst(rst),
+    .payload(ip_payload_data),
+    .payload_valid(ip_payload_valid),
+    .ip_header_valid(ip_header_valid),
+    .ip_payload_done(ip_payload_done),
+    .ip_protocol(ip_protocol),
+    .error(ip_error),
+    .icmp_type(icmp_type),
+    .icmp_code(icmp_code),
+    .icmp_checksum(icmp_checksum_rx),
+    .icmp_identifier(icmp_identifier),
+    .icmp_seq_num(icmp_seq_num),
+    .icmp_header_valid(icmp_header_valid),
+    .icmp_checksum_val(icmp_checksum_val),
+    .icmp_payload_data(icmp_payload_data),
+    .icmp_payload_valid(icmp_payload_valid),
+    .icmp_payload_done(icmp_payload_done),
+    .icmp_error(icmp_error)
+);
+ 
 tcp_rx u_tcp_rx (
     .rx_clk(rx_clk),
     .rst(rst),
@@ -766,53 +959,6 @@ ilink_rx u_ilink_rx (
  
 assign tcprx_payload_ready = ilrx_payload_ready;
  
-//icmp_parser u_icmp_parser (
-//    .clk(rx_clk),
-//    .rst(rst),
-//    .payload(ip_payload_data),
-//    .payload_valid(ip_payload_valid),
-//    .ip_header_valid(ip_header_valid),
-//    .ip_payload_done(ip_payload_done),
-//    .ip_protocol(ip_protocol),
-//    .error(ip_error),
-//    .icmp_type(icmp_type),
-//    .icmp_code(icmp_code),
-//    .icmp_checksum(icmp_checksum_rx),
-//    .icmp_identifier(icmp_identifier),
-//    .icmp_seq_num(icmp_seq_num),
-//    .icmp_header_valid(icmp_header_valid),
-//    .icmp_checksum_val(icmp_checksum_val),
-//    .icmp_payload_data(icmp_payload_data),
-//    .icmp_payload_valid(icmp_payload_valid),
-//    .icmp_payload_done(icmp_payload_done),
-//    .icmp_error(icmp_error)
-//);
- 
-//icmp_csum_adjust u_csum_adjust (
-//    .csum_in(rep_icmp_checksum_rx),
-//    .csum_out(icmp_checksum_tx)
-//);
- 
-//icmp_tx u_icmp_tx (
-//    .tx_clk(tx_clk),
-//    .rst(rst),
-//    .identifier(rep_identifier),
-//    .seq(rep_seq),
-//    .icmp_checksum(icmp_checksum_tx),
-//    .start(icmp_tx_start),
-//    .done(icmp_tx_done),
-//    .payload_in_data(icmp_fifo_mem[icmp_fifo_rd_ptr]),
-//    .payload_in_valid(icmp_fifo_valid_tx),
-//    .payload_in_ready(icmp_fifo_ready),
-//    .payload_data(ictx_data),
-//    .payload_valid(ictx_valid),
-//    .payload_ready(ictx_ready)
-//);
- 
-//------------------------------------------------------------------------------
-//TX STACK
-//------------------------------------------------------------------------------
- 
 mm_core #(
     .HALF_SPREAD(HALF_SPREAD),
     .MAX_POSITION(MAX_POSITION),
@@ -834,7 +980,7 @@ mm_core #(
     .best_ask_price(mm_best_ask_price_r),
     .best_ask_size(mm_best_ask_size_r),
     .book_valid(mm_book_valid_r),
-    .gap_detected(ob_gap_detected), //rx domain — ok for low-rate gating
+    .gap_detected(ob_gap_detected),
     .rd_level(mm_rd_level),
     .rd_side(mm_rd_side),
     .rd_price(ob_rd_price),
@@ -942,6 +1088,27 @@ ilink_tx u_ilink_tx (
     .ask_order_id(ask_order_id_tx)
 );
  
+icmp_csum_adjust u_csum_adjust (
+    .csum_in(rep_icmp_checksum_rx),
+    .csum_out(icmp_checksum_tx)
+);
+ 
+icmp_tx u_icmp_tx (
+    .tx_clk(tx_clk),
+    .rst(rst),
+    .identifier(rep_identifier),
+    .seq(rep_seq),
+    .icmp_checksum(icmp_checksum_tx),
+    .start(icmp_tx_start),
+    .done(icmp_tx_done),
+    .payload_in_data(icmp_fifo_mem[icmp_fifo_rd_ptr]),
+    .payload_in_valid(icmp_fifo_valid_tx),
+    .payload_in_ready(icmp_fifo_ready),
+    .payload_data(ictx_data),
+    .payload_valid(ictx_valid),
+    .payload_ready(ictx_ready)
+);
+ 
 tcp_tx u_tcp_tx (
     .tx_clk(tx_clk),
     .rst(rst),
@@ -1031,5 +1198,5 @@ arp_handler #(
     .payload_valid(arp_payload_valid),
     .payload_ready(arp_payload_ready)
 );
- 
+
 endmodule
