@@ -692,7 +692,7 @@ always_ff @(posedge tx_clk) begin
         tcp_pending <= 0;
     end else begin
         if (sess_ctrl_start || iltx_start) tcp_pending <= 1;
-        if (tx_state == TX_IDLE && tcp_pending) tcp_pending <= 0;
+        else if (tx_state == TX_WAIT) tcp_pending <= 0;
     end
 end
  
