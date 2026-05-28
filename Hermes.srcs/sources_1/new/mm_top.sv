@@ -870,7 +870,7 @@ always_ff @(posedge tx_clk) begin
                         4'd6: uart_data <= hex_char(uart_price_latch[11:8]);
                         4'd7: uart_data <= hex_char(uart_price_latch[7:4]);
                         4'd8: uart_data <= hex_char(uart_price_latch[3:0]);
-                        4'd9: uart_data <= 8'h0A;
+                        4'd9: uart_data <= 8'h0D;
                         4'd10: uart_data <= 8'h0A;
                         default: uart_data <= 8'h0A;
                     endcase
@@ -908,7 +908,7 @@ always_ff @(posedge tx_clk) begin
                                 4'hF: uart_data <= 8'h46;
                             endcase
                         end
-                        4'd2: uart_data <= 8'h0A;
+                        4'd2: uart_data <= 8'h0D;
                         4'd3: uart_data <= 8'h0A;
                         default: uart_data <= 8'h0A;
                     endcase
