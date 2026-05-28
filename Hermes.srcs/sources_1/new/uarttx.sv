@@ -20,9 +20,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module uarttx(output logic tx, input logic baud, input logic [7:0] data, input logic ready, input logic rst, input logic clk);
+module uarttx(output logic tx, output logic busy, input logic baud, input logic [7:0] data, input logic ready, input logic rst, input logic clk);
  logic [9:0] sr;
- logic busy;
  logic [3:0] count;
 
 always_ff @(posedge clk) begin
