@@ -195,7 +195,7 @@ always_ff @(posedge rx_clk) begin
     end
 end
  
-localparam ICMP_FIFO_DEPTH = 256;
+localparam ICMP_FIFO_DEPTH = 256; //icmp fifo
 localparam ICMP_FIFO_AW = $clog2(ICMP_FIFO_DEPTH);
 logic [7:0] icmp_fifo_mem [0:ICMP_FIFO_DEPTH-1];
 logic [ICMP_FIFO_AW-1:0] icmp_fifo_wr_ptr;
@@ -685,6 +685,16 @@ typedef enum logic [1:0] {
 tx_state_t tx_state;
  
 logic icmp_tx_start;
+
+logic tcp_pending; //latch 
+always_ff @(posedge tx_clk) begin
+    if (rst) begin
+        tcp_pending <= 0;
+    end else begin
+        if (sess_ctrl_start || iltx_start) tcp_pending <= 1;
+        if (tx_state == TX_IDLE && tcp_pending) tcp_pending <= 0;
+    end
+end
  
 always_ff @(posedge tx_clk) begin
     if (rst) begin
@@ -706,12 +716,12 @@ always_ff @(posedge tx_clk) begin
                     tx_is_arp <= 1;
                     tx_is_tcp <= 0;
                     tx_state <= TX_WAIT;
-                end else if (sess_ctrl_start || iltx_start) begin
+                end else if (tcp_pending) begin
                     ethtx_start <= 1;
                     tx_is_arp <= 0;
                     tx_is_tcp <= 1;
                     tx_state <= TX_WAIT;
-                end else if (icmp_fifo_valid_tx) begin
+                end else if (icmp_fifo_valid_tx) begin //level pulse, survives waiting
                     icmp_tx_start <= 1;
                     ethtx_start <= 1;
                     tx_is_arp <= 0;
