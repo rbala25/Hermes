@@ -75,4 +75,35 @@ mm_top #(
     .led(led)
 );
 
+task automatic send_nibble(input logic [3:0] nib);
+    @(posedge rx_clk);
+    rxd <= nib;
+    rx_dv <= 1;
+endtask
+
+task automatic send_byte(input logic [7:0] b);
+    send_nibble(b[3:0]);
+    send_nibble(b[7:4]);
+endtask
+ 
+task automatic send_preamble; //7 preamble + sfd
+    integer i;
+    for (i = 0; i < 7; i++) send_byte(8'h55);
+    send_byte(8'hD5);
+endtask
+
+task automatic send_eth_frame(input logic [47:0] dst_mac, input logic [47:0] src_mac, input logic [15:0] etype,
+    input logic [7:0] payload [], input integer payload_len);
+    send_preamble();
+    for (int i = 0; i < 6; i++) send_byte(dst_mac[8*i +: 8]); //dst mac
+    for (int i = 0; i < 6; i++) send_byte(src_mac[8*i +: 8]);
+    send_byte(etype[15:8]);
+    send_byte(etype[7:0]);
+    for (int i = 0; i < payload_len; i++) send_byte(payload[i]);
+    @(posedge rx_clk);
+    rx_dv <= 0;
+    rxd <= 0;
+    repeat(24) @(posedge rx_clk);
+endtask
+
 endmodule
