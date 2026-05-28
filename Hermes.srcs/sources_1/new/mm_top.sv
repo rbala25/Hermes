@@ -192,7 +192,7 @@ logic [2047:0] ilrx_biz_text;
 
 
 
-
+//mm core - tx clk :(
 localparam MD2_FIFO_DEPTH = 16;
 localparam MD2_FIFO_AW = $clog2(MD2_FIFO_DEPTH);
 localparam MD2_WIDTH = 292;
@@ -286,6 +286,78 @@ always_ff @(posedge tx_clk) begin
     end else begin
         mm_book_valid_r <= 0;
         mm_trade_valid_r <= 0;
+    end
+end
+
+
+
+
+
+localparam FILL_FIFO_DEPTH = 16;
+localparam FILL_FIFO_AW = $clog2(FILL_FIFO_DEPTH);
+localparam FILL_WIDTH = 105;
+ 
+logic [FILL_WIDTH-1:0] fill_fifo_mem [0:FILL_FIFO_DEPTH-1];
+logic [FILL_FIFO_AW-1:0] fill_wr_ptr;
+logic [FILL_FIFO_AW-1:0] fill_rd_ptr;
+ 
+logic [FILL_FIFO_AW-1:0] fill_wr_ptr_meta, fill_wr_ptr_tx;
+always_ff @(posedge tx_clk) begin //same thing lol
+    if (rst) begin
+        fill_wr_ptr_meta <= 0;
+        fill_wr_ptr_tx <= 0;
+    end else begin
+        fill_wr_ptr_meta <= fill_wr_ptr;
+        fill_wr_ptr_tx <= fill_wr_ptr_meta;
+    end
+end
+ 
+logic fill_fifo_not_empty;
+assign fill_fifo_not_empty = (fill_rd_ptr != fill_wr_ptr_tx);
+ 
+always_ff @(posedge rx_clk) begin
+    if (rst) begin
+        fill_wr_ptr <= 0;
+    end else if (ilrx_exec_trade) begin
+        fill_fifo_mem[fill_wr_ptr] <= {
+            ilrx_exec_trade,
+            ilrx_fill_price,
+            ilrx_fill_qty,
+            ilrx_fill_side
+        };
+        fill_wr_ptr <= fill_wr_ptr + 1;
+    end
+end
+ 
+logic [FILL_WIDTH-1:0] fill_fifo_rdata;
+assign fill_fifo_rdata = fill_fifo_mem[fill_rd_ptr];
+ 
+logic fill_valid_bit_w;
+logic [63:0] fill_price_w;
+logic [31:0] fill_qty_w;
+logic [7:0] fill_side_w;
+assign {fill_valid_bit_w, fill_price_w, fill_qty_w, fill_side_w} = fill_fifo_rdata;
+ 
+logic mm_fill_valid;
+logic [63:0] mm_fill_price;
+logic [31:0] mm_fill_size;
+logic mm_fill_side;
+ 
+always_ff @(posedge tx_clk) begin
+    if (rst) begin
+        fill_rd_ptr <= 0;
+        mm_fill_valid <= 0;
+        mm_fill_price <= 0;
+        mm_fill_size <= 0;
+        mm_fill_side <= 0;
+    end else if (fill_fifo_not_empty) begin
+        mm_fill_valid <= fill_valid_bit_w;
+        mm_fill_price <= fill_price_w;
+        mm_fill_size <= fill_qty_w;
+        mm_fill_side <= fill_side_w[0]; 
+        fill_rd_ptr <= fill_rd_ptr + 1;
+    end else begin
+        mm_fill_valid <= 0;
     end
 end
 
