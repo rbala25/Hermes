@@ -106,4 +106,47 @@ task automatic send_eth_frame(input logic [47:0] dst_mac, input logic [47:0] src
     repeat(24) @(posedge rx_clk);
 endtask
 
+task automatic send_ip_frame(
+    input logic [47:0] dst_mac,
+    input logic [47:0] src_mac,
+    input logic [31:0] src_ip,
+    input logic [31:0] dst_ip,
+    input logic [7:0] protocol,
+    input logic [7:0] ip_payload [],
+    input integer ip_payload_len
+);
+    logic [7:0] eth_payload [];
+    integer ip_total_len;
+    integer i;
+ 
+    ip_total_len = 20 + ip_payload_len; //20 byte header
+    eth_payload = new[ip_total_len];
+ 
+    eth_payload[0] = 8'h45;
+    eth_payload[1] = 8'h00;
+    eth_payload[2] = ip_total_len[15:8];
+    eth_payload[3] = ip_total_len[7:0];
+    eth_payload[4] = 8'h00; 
+    eth_payload[5] = 8'h01;
+    eth_payload[6] = 8'h00; 
+    eth_payload[7] = 8'h00;
+    eth_payload[8] = 8'h40; 
+    eth_payload[9] = protocol;
+    eth_payload[10] = 8'h00; //csum ignore
+    eth_payload[11] = 8'h00; 
+    eth_payload[12] = src_ip[31:24];
+    eth_payload[13] = src_ip[23:16];
+    eth_payload[14] = src_ip[15:8];
+    eth_payload[15] = src_ip[7:0];
+    eth_payload[16] = dst_ip[31:24];
+    eth_payload[17] = dst_ip[23:16];
+    eth_payload[18] = dst_ip[15:8];
+    eth_payload[19] = dst_ip[7:0];
+ 
+    for (i = 0; i < ip_payload_len; i++)
+        eth_payload[20 + i] = ip_payload[i];
+ 
+    send_eth_frame(dst_mac, src_mac, 16'h0800, eth_payload, ip_total_len);
+endtask
+
 endmodule
