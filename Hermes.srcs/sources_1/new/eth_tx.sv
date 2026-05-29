@@ -154,16 +154,16 @@ always_ff @(posedge tx_clk) begin
                         payload_ready <= 1;
                         if (pl_cnt < 46) pl_cnt <= pl_cnt + 1;
                     end else if (pl_cnt < 46) begin
-                        txd <= 8'h00; //padding w zero to get to minimum size (60 bytes + FCS)
+                        txd <= 8'h00;
                         pl_cnt <= pl_cnt + 1;
-                    end else begin //append fcs
+                    end else begin
                         fcs_latch <= ~crc_next;
                         txd <= ~crc_next[7:0];
                         fcs_cnt <= 1;
                         state <= fcs;
                     end
                 end
-             end
+            end
              
              fcs: begin
                 tx_valid <= 1;

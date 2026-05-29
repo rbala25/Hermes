@@ -86,14 +86,15 @@ always_ff @(posedge tx_clk) begin
                 end else begin
                     txd <= byte_buf[7:4];
                     nibble_sel <= ~nibble_sel;
-                    ready <= 1;
-                    if(valid) byte_buf <= data;
-                    else begin 
-//                        $display("MII_TX: valid dropped in transmit t=%0t", $time);
-                         state <= idle; 
-                     end
+                    if(valid) begin
+                        byte_buf <= data;
+                        ready <= 1;
+                    end else begin
+                        ready <= 1;
+                        state <= idle;
+                    end
                 end
-            end
+            end 
         endcase
     end
 end

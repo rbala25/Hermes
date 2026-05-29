@@ -23,7 +23,7 @@
 module mm_top #(
     parameter logic [47:0] MY_MAC = 48'h00183E03E41B,
     parameter logic [31:0] MY_IP = 32'hC0A80164,
-    parameter logic [31:0] CME_IP = 32'hC0A80101,
+    parameter logic [31:0] CME_IP = 32'hC0A80102,
     parameter logic [15:0] CME_PORT = 16'd10000,
     parameter logic [15:0] SRC_PORT = 16'd12345,
     parameter logic [31:0] ISN = 32'hDEADBEEF,
@@ -676,6 +676,12 @@ logic arp_payload_ready;
  
 logic tx_is_arp;
 logic tx_is_tcp;
+
+logic [47:0] gateway_mac;
+always_ff @(posedge tx_clk) begin
+    if (rst) gateway_mac <= 0;
+    else if (arp_pending) gateway_mac <= arp_reply_dst_mac;
+end
  
 logic [47:0] mux_dst_mac;
 logic [15:0] mux_ether_type;
@@ -684,7 +690,7 @@ logic mux_payload_valid;
 logic mux_payload_ready;
  
 //assign mux_dst_mac = tx_is_arp ? arp_reply_dst_mac : rep_dst_mac;
-assign mux_dst_mac = tx_is_arp ? arp_reply_dst_mac : tx_is_tcp ? 48'hFFFFFFFFFFFF : rep_dst_mac;
+assign mux_dst_mac = tx_is_arp ? arp_reply_dst_mac : tx_is_tcp ? gateway_mac : rep_dst_mac;
 assign mux_ether_type = tx_is_arp ? 16'h0806 : 16'h0800;
 assign mux_payload_data = tx_is_arp ? arp_payload_data : iptx_data;
 assign mux_payload_valid = tx_is_arp ? arp_payload_valid : iptx_valid;
@@ -961,6 +967,25 @@ end
 //end
 
 //assign led[0] = uart_busy;
+
+logic [15:0] tcp_length_lat;
+logic [7:0] tcp_flags_lat;
+logic [31:0] tcp_ack_num_lat;
+logic [15:0] tcp_payload_csum_lat;
+
+always_ff @(posedge tx_clk) begin
+    if (rst) begin
+        tcp_length_lat <= 0;
+        tcp_flags_lat <= 0;
+        tcp_ack_num_lat <= 0;
+        tcp_payload_csum_lat <= 0;
+    end else if (sess_ctrl_start || iltx_start) begin
+        tcp_length_lat <= tcp_length_mux;
+        tcp_flags_lat <= tcp_flags_mux;
+        tcp_ack_num_lat <= tcp_ack_num_mux;
+        tcp_payload_csum_lat <= tcp_payload_csum_mux;
+    end
+end
 
 logic link_ready_rx_meta, link_ready_rx;
 always_ff @(posedge rx_clk) begin
@@ -1408,13 +1433,13 @@ tcp_tx u_tcp_tx (
     .rst(rst),
     .src_ip(MY_IP),
     .dst_ip(CME_IP),
-    .tcp_length(tcp_length_mux),
+    .tcp_length(tcp_length_lat),
     .src_port(SRC_PORT),
     .dst_port(CME_PORT),
-    .ack_num(tcp_ack_num_mux),
-    .flags(tcp_flags_mux),
+    .ack_num(tcp_ack_num_lat),
+    .flags(tcp_flags_lat),
     .window_size(16'hFFFF),
-    .payload_csum(tcp_payload_csum_mux),
+    .payload_csum(tcp_payload_csum_lat),
     .init_seq(sess_init_seq),
     .load_seq(sess_load_seq),
     .start(tcp_start_mux),
@@ -1427,6 +1452,12 @@ tcp_tx u_tcp_tx (
     .payload_valid(tcptx_payload_valid),
     .payload_ready(ip_payload_mux_ready)
 );
+
+logic [15:0] ip_total_len_lat;
+always_ff @(posedge tx_clk) begin
+    if (rst) ip_total_len_lat <= 0;
+    else if (sess_ctrl_start || iltx_start) ip_total_len_lat <= ip_total_len_mux;
+end
  
 ip_tx u_ip_tx (
     .tx_clk(tx_clk),
@@ -1434,7 +1465,7 @@ ip_tx u_ip_tx (
     .src_ip(MY_IP),
     .dst_ip(ip_dst_mux),
     .protocol(ip_protocol_mux),
-    .total_length(ip_total_len_mux),
+    .total_length(ip_total_len_lat),
     .identification(ip_id_mux),
     .start(iptx_start),
     .done(iptx_done),
@@ -1536,9 +1567,15 @@ always_ff @(posedge tx_clk) begin
     else if (sess_ctrl_start) sess_start_seen <= 1;
 end
 
+logic ethtx_done_seen;
+always_ff @(posedge tx_clk) begin
+    if (rst) ethtx_done_seen <= 0;
+    else if (ethtx_done) ethtx_done_seen <= 1;
+end
+
 assign led[0] = link_ready;
 assign led[1] = tx_en;
 assign led[2] = sess_start_seen;
-assign led[3] = tcp_pulse_seen;
+assign led[3] = ethtx_done_seen;
 
 endmodule

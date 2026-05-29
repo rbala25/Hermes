@@ -125,13 +125,11 @@ always_ff @(posedge tx_clk) begin
                     tx_data <= payload_data;
                     payload_ready <= 1;
                 end
-                
                 if(tx_ready && !payload_valid) begin
                     done <= 1;
                     state <= idle;
                     tx_valid <= 0;
                 end
-
             end
         endcase
     end
