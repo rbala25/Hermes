@@ -973,17 +973,17 @@ uarttx u_uarttx (
 );
 
 logic mdio_done;
-//mdio_init u_mdio_init (
-//    .clk(clk_100),
-//    .rst(rst),
-//    .mdc(eth_mdc),
-//    .mdio(eth_mdio),
-//    .done(mdio_done)
-//);
+mdio_init u_mdio_init (
+    .clk(clk_100),
+    .rst(rst),
+    .mdc(eth_mdc),
+    .mdio(eth_mdio),
+    .done(mdio_done)
+);
 
-assign eth_mdc = 0;
-assign eth_mdio = 1;
-assign mdio_done = 1;
+//assign eth_mdc = 0;
+//assign eth_mdio = 1;
+//assign mdio_done = 1;
 
 mii_rx u_mii_rx (
     .rxclk(rx_clk),
@@ -1277,7 +1277,7 @@ mm_core #(
 
 logic tcp_connect_sent;
 logic tcp_connect_pulse;
-logic [24:0] link_delay;
+logic [26:0] link_delay;
 //logic link_ready;
 
 always_ff @(posedge tx_clk) begin
@@ -1286,14 +1286,14 @@ always_ff @(posedge tx_clk) begin
         link_ready <= 0;
     end else if (!link_ready) begin
         link_delay <= link_delay + 1;
-        if (link_delay == 25'd24999999) link_ready <= 1;
+        if (link_delay == 27'd74999999) link_ready <= 1;
     end
 end
 
 always_ff @(posedge tx_clk) begin
     if (rst) begin
-//        tcp_connect_sent <= 0;
-        tcp_connect_sent <= 1; //test
+        tcp_connect_sent <= 0;
+//        tcp_connect_sent <= 1; //test
         tcp_connect_pulse <= 0;
     end else begin
         tcp_connect_pulse <= 0;
