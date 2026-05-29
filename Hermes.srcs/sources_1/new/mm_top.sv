@@ -1487,9 +1487,19 @@ arp_handler #(
 //assign led[1] = ob_gap_detected; //order book gap
 //assign led[2] = ilrx_exec_trade; //fill received
 //assign led[3] = ob_book_valid; //book live
-assign led[0] = mdio_done; // PHY init complete
-//assign led[1] = mii_rx_valid; // any RX nibbles arriving (will flicker)
-assign led[1] = tx_en;
-assign led[2] = eth_header_valid; // eth frames parsed
-assign led[3] = arp_pending; // ARP request received and queued
+//assign led[0] = mdio_done; // PHY init complete
+////assign led[1] = mii_rx_valid; // any RX nibbles arriving (will flicker)
+//assign led[1] = tx_en;
+////assign led[2] = eth_header_valid; // eth frames parsed
+////assign led[2] = ethtx_done;
+//assign led[2] = iptx_done;
+////assign led[3] = arp_pending; // ARP request received and queued
+//assign led[3] = sess_ctrl_start;
+
+
+assign led[0] = arp_pending;
+assign led[1] = tcp_pending;
+assign led[2] = icmp_fifo_valid_tx;
+assign led[3] = tx_is_arp;
+
 endmodule

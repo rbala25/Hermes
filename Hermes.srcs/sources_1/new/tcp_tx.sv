@@ -130,8 +130,15 @@ always_ff @(posedge tx_clk) begin
                         5'd17: payload_data <= checksum[7:0];
                         5'd18: payload_data <= 8'h00; //urgent ptr
                         5'd19: begin
-                            payload_data <= 8'h00; //urgent ptr
-                            state <= data;
+                            payload_data <= 8'h00;
+                            if (tcp_length == 16'd20) begin
+                                seq_num <= seq_num + (flags[1] ? 32'd1 : 32'd0) + (flags[0] ? 32'd1 : 32'd0);
+                                done <= 1;
+                                payload_valid <= 0;
+                                state <= idle;
+                            end else begin
+                                state <= data;
+                            end
                         end
                         default: payload_data <= 8'h00;
                     endcase
