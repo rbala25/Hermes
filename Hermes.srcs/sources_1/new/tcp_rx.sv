@@ -53,7 +53,7 @@ module tcp_rx(
     );
  
 typedef enum logic [2:0] {
-    idle, header, csum_check, options, payload_state
+    idle, header, csum_check, options, csum_final, payload_state
 } state_t;
  
 state_t state;
@@ -72,7 +72,10 @@ logic [31:0] csum_with_pseudo;
 logic [16:0] csum_fold1;
 logic [15:0] csum_fold2;
  
-assign csum_with_pseudo = csum_acc + {16'h0, src_ip[31:16]} + {16'h0, src_ip[15:0]} + {16'h0, dst_ip[31:16]} + {16'h0, dst_ip[15:0]} + 32'h0006 + {16'h0, tcp_length};
+assign csum_with_pseudo = csum_acc
+    + {16'h0, src_ip[31:16]} + {16'h0, src_ip[15:0]}
+    + {16'h0, dst_ip[31:16]} + {16'h0, dst_ip[15:0]}
+    + 32'h0006 + {16'h0, tcp_length};
  
 assign csum_fold1 = {1'b0, csum_with_pseudo[15:0]} + {1'b0, csum_with_pseudo[31:16]};
 assign csum_fold2 = csum_fold1[15:0] + {15'h0, csum_fold1[16]};
@@ -158,21 +161,23 @@ always_ff @(posedge rx_clk) begin
             end
  
             csum_check: begin
-                if (csum_fold2 == 16'hFFFF) begin
-                    header_valid <= 1;
-                    rx_syn <= flags[1];
-                    rx_ack <= flags[4];
-                    rx_fin <= flags[0];
-                    rx_rst <= flags[2];
-                    if (options_remaining > 0)
-                        state <= options;
-                    else if (tcp_length > header_len)
-                        state <= payload_state;
-                    else
+                if (options_remaining > 0)
+                    state <= options;
+                else begin
+                    if (csum_fold2 == 16'hFFFF) begin
+                        header_valid <= 1;
+                        rx_syn <= flags[1];
+                        rx_ack <= flags[4];
+                        rx_fin <= flags[0];
+                        rx_rst <= flags[2];
+                        if (tcp_length > header_len)
+                            state <= payload_state;
+                        else
+                            state <= idle;
+                    end else begin
+                        csum_error <= 1;
                         state <= idle;
-                end else begin
-                    csum_error <= 1;
-                    state <= idle;
+                    end
                 end
             end
  
@@ -187,12 +192,25 @@ always_ff @(posedge rx_clk) begin
                         csum_hi_valid <= 1;
                     end
                     options_remaining <= options_remaining - 1;
-                    if (options_remaining == 1) begin
-                        if (tcp_length > header_len)
-                            state <= payload_state;
-                        else
-                            state <= idle;
-                    end
+                    if (options_remaining == 1)
+                        state <= csum_final;
+                end
+            end
+ 
+            csum_final: begin
+                if (csum_fold2 == 16'hFFFF) begin
+                    header_valid <= 1;
+                    rx_syn <= flags[1];
+                    rx_ack <= flags[4];
+                    rx_fin <= flags[0];
+                    rx_rst <= flags[2];
+                    if (tcp_length > header_len)
+                        state <= payload_state;
+                    else
+                        state <= idle;
+                end else begin
+                    csum_error <= 1;
+                    state <= idle;
                 end
             end
  
