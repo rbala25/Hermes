@@ -680,7 +680,7 @@ logic tx_is_tcp;
 logic [47:0] gateway_mac;
 always_ff @(posedge tx_clk) begin
     if (rst) gateway_mac <= 0;
-    else if (arp_pending) gateway_mac <= arp_reply_dst_mac;
+    else if (arp_pending && arp_reply_dst_mac != 0) gateway_mac <= arp_reply_dst_mac;
 end
  
 logic [47:0] mux_dst_mac;
@@ -1327,14 +1327,27 @@ always_ff @(posedge tx_clk) begin
     end
 end
 
+//always_ff @(posedge tx_clk) begin
+//    if (rst) begin
+//        tcp_connect_sent <= 0;
+////        tcp_connect_sent <= 1; //test
+//        tcp_connect_pulse <= 0;
+//    end else begin
+//        tcp_connect_pulse <= 0;
+//        if (link_ready && !tcp_connect_sent && !sess_established) begin
+//            tcp_connect_pulse <= 1;
+//            tcp_connect_sent <= 1;
+//        end
+//    end
+//end
+
 always_ff @(posedge tx_clk) begin
     if (rst) begin
         tcp_connect_sent <= 0;
-//        tcp_connect_sent <= 1; //test
         tcp_connect_pulse <= 0;
     end else begin
         tcp_connect_pulse <= 0;
-        if (link_ready && !tcp_connect_sent && !sess_established) begin
+        if (link_ready && !tcp_connect_sent && !sess_established && gateway_mac != 0) begin
             tcp_connect_pulse <= 1;
             tcp_connect_sent <= 1;
         end
@@ -1456,7 +1469,7 @@ tcp_tx u_tcp_tx (
 logic [15:0] ip_total_len_lat;
 always_ff @(posedge tx_clk) begin
     if (rst) ip_total_len_lat <= 0;
-    else if (sess_ctrl_start || iltx_start) ip_total_len_lat <= ip_total_len_mux;
+    else if (sess_ctrl_start || iltx_start) ip_total_len_lat <= tcp_length_mux + 16'd20;
 end
  
 ip_tx u_ip_tx (
