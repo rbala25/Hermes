@@ -683,7 +683,8 @@ logic [7:0] mux_payload_data;
 logic mux_payload_valid;
 logic mux_payload_ready;
  
-assign mux_dst_mac = tx_is_arp ? arp_reply_dst_mac : rep_dst_mac;
+//assign mux_dst_mac = tx_is_arp ? arp_reply_dst_mac : rep_dst_mac;
+assign mux_dst_mac = tx_is_arp ? arp_reply_dst_mac : tx_is_tcp ? 48'hFFFFFFFFFFFF : rep_dst_mac;
 assign mux_ether_type = tx_is_arp ? 16'h0806 : 16'h0800;
 assign mux_payload_data = tx_is_arp ? arp_payload_data : iptx_data;
 assign mux_payload_valid = tx_is_arp ? arp_payload_valid : iptx_valid;

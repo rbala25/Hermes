@@ -92,7 +92,7 @@ always_ff @(posedge clk) begin
         unique case (state)
             WAIT: begin
                 wait_cnt <= wait_cnt + 1;
-                if (wait_cnt == WAIT_CYC - 1) begin
+                if (wait_cnt == WAIT1_CYC - 1) begin
                     wait_cnt <= 0;
                     state <= SEND;
                     mdio <= FRAMES[NBITS-1];
