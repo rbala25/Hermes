@@ -721,7 +721,7 @@ logic icmp_tx_start;
  
 logic tcp_pending;
 always_ff @(posedge tx_clk) begin
-    if (rst) begin
+    if (rst || !link_ready) begin
         tcp_pending <= 0;
     end else begin
         if (tx_state == TX_IDLE && tcp_pending) tcp_pending <= 0;
@@ -962,6 +962,17 @@ end
 
 //assign led[0] = uart_busy;
 
+logic link_ready_rx_meta, link_ready_rx;
+always_ff @(posedge rx_clk) begin
+    if (rst) begin
+        link_ready_rx_meta <= 0;
+        link_ready_rx <= 0;
+    end else begin
+        link_ready_rx_meta <= link_ready;
+        link_ready_rx <= link_ready_rx_meta;
+    end
+end
+
 uarttx u_uarttx (
     .clk(tx_clk),
     .rst(rst),
@@ -991,7 +1002,7 @@ mii_rx u_mii_rx (
     .rxd(rxd),
     .rx_dv(rx_dv),
     .rx_er(1'b0),
-    .rst(rst),
+    .rst(rst || !link_ready_rx),
     .data(mii_rx_data),
     .valid(mii_rx_valid),
     .frame_active(mii_rx_frame_active)
@@ -1437,7 +1448,7 @@ ip_tx u_ip_tx (
  
 eth_tx u_eth_tx (
     .tx_clk(tx_clk),
-    .rst(rst),
+    .rst(rst || !link_ready),
     .dst_mac(mux_dst_mac),
     .ether_type(mux_ether_type),
     .payload_data(mux_payload_data),
@@ -1452,7 +1463,7 @@ eth_tx u_eth_tx (
  
 mii_tx u_mii_tx (
     .tx_clk(tx_clk),
-    .rst(rst),
+    .rst(rst || !link_ready),
     .data(ethtx_data),
     .valid(ethtx_valid),
     .ready(ethtx_ready),
@@ -1487,19 +1498,47 @@ arp_handler #(
 //assign led[1] = ob_gap_detected; //order book gap
 //assign led[2] = ilrx_exec_trade; //fill received
 //assign led[3] = ob_book_valid; //book live
-//assign led[0] = mdio_done; // PHY init complete
-////assign led[1] = mii_rx_valid; // any RX nibbles arriving (will flicker)
+
+//assign led[0] = arp_pending;
+//assign led[1] = tcp_pending;
+//assign led[2] = icmp_fifo_valid_tx;
+//assign led[3] = tx_is_arp;
+
+//assign led[0] = ethtx_start;
+//assign led[1] = ethtx_valid;
+//assign led[2] = tx_is_tcp;
+//assign led[3] = tx_is_arp;
+
+//assign led[0] = mdio_done;
+//assign led[1] = sess_ctrl_start;
+//assign led[2] = tcp_connect_pulse;
+//assign led[3] = link_ready;
+
+//assign led[0] = link_ready;
+//assign led[1] = arp_pending;
+//assign led[2] = icmp_fifo_valid_tx;
+//assign led[3] = tx_en;
+
+//assign led[0] = link_ready;
 //assign led[1] = tx_en;
-////assign led[2] = eth_header_valid; // eth frames parsed
-////assign led[2] = ethtx_done;
-//assign led[2] = iptx_done;
-////assign led[3] = arp_pending; // ARP request received and queued
-//assign led[3] = sess_ctrl_start;
+//assign led[2] = sess_ctrl_start;
+//assign led[3] = tcp_connect_pulse;
 
+logic tcp_pulse_seen;
+always_ff @(posedge tx_clk) begin
+    if (rst) tcp_pulse_seen <= 0;
+    else if (tcp_connect_pulse) tcp_pulse_seen <= 1;
+end
 
-assign led[0] = arp_pending;
-assign led[1] = tcp_pending;
-assign led[2] = icmp_fifo_valid_tx;
-assign led[3] = tx_is_arp;
+logic sess_start_seen;
+always_ff @(posedge tx_clk) begin
+    if (rst) sess_start_seen <= 0;
+    else if (sess_ctrl_start) sess_start_seen <= 1;
+end
+
+assign led[0] = link_ready;
+assign led[1] = tx_en;
+assign led[2] = sess_start_seen;
+assign led[3] = tcp_pulse_seen;
 
 endmodule
