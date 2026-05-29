@@ -586,65 +586,78 @@ logic sess_tx_grant;
 logic sess_established;
 logic sess_closed;
  
-//pack all tcp_rx header signals into one word on rx_clk when header_valid fires
-//then 2FF the packed word into tx_clk so all signals arrive together
-//this prevents tcp_session from seeing header_valid on a different tx_clk cycle
-//than rx_syn/rx_ack due to independent synchronizer skew
-localparam TCPRX_PACK_W = 1+1+1+1+1+32; //hv, syn, ack, fin, rst, seq
-logic [TCPRX_PACK_W-1:0] tcprx_pack_rx;
-logic [TCPRX_PACK_W-1:0] tcprx_pack_meta, tcprx_pack_tx;
- 
+logic rx_syn_lat, rx_ack_lat, rx_fin_lat, rx_rst_lat;
+logic [31:0] rx_seq_lat;
+logic rx_hv_toggle;
+
 always_ff @(posedge rx_clk) begin
     if (rst) begin
-        tcprx_pack_rx <= 0;
-    end else begin
-        tcprx_pack_rx <= {
-            tcprx_header_valid,
-            tcprx_rx_syn,
-            tcprx_rx_ack,
-            tcprx_rx_fin,
-            tcprx_rx_rst,
-            tcprx_seq_num
-        };
+        rx_syn_lat <= 0;
+        rx_ack_lat <= 0;
+        rx_fin_lat <= 0;
+        rx_rst_lat <= 0;
+        rx_seq_lat <= 0;
+        rx_hv_toggle <= 0;
+    end else if (tcprx_header_valid) begin
+        rx_syn_lat <= tcprx_rx_syn;
+        rx_ack_lat <= tcprx_rx_ack;
+        rx_fin_lat <= tcprx_rx_fin;
+        rx_rst_lat <= tcprx_rx_rst;
+        rx_seq_lat <= tcprx_seq_num;
+        rx_hv_toggle <= ~rx_hv_toggle;
     end
 end
- 
+
+logic rx_hv_tog_meta, rx_hv_tog_tx, rx_hv_tog_tx_r;
 always_ff @(posedge tx_clk) begin
     if (rst) begin
-        tcprx_pack_meta <= 0;
-        tcprx_pack_tx <= 0;
+        rx_hv_tog_meta <= 0;
+        rx_hv_tog_tx <= 0;
+        rx_hv_tog_tx_r <= 0;
     end else begin
-        tcprx_pack_meta <= tcprx_pack_rx;
-        tcprx_pack_tx <= tcprx_pack_meta;
+        rx_hv_tog_meta <= rx_hv_toggle;
+        rx_hv_tog_tx <= rx_hv_tog_meta;
+        rx_hv_tog_tx_r <= rx_hv_tog_tx;
     end
 end
- 
+
 logic tcprx_hv_tx;
 logic tcprx_syn_tx;
 logic tcprx_ack_tx;
 logic tcprx_fin_tx;
 logic tcprx_rst_tx;
 logic [31:0] tcprx_seq_tx;
- 
-assign {tcprx_hv_tx, tcprx_syn_tx, tcprx_ack_tx,
-        tcprx_fin_tx, tcprx_rst_tx, tcprx_seq_tx} = tcprx_pack_tx;
+
+assign tcprx_hv_tx = rx_hv_tog_tx ^ rx_hv_tog_tx_r;
+assign tcprx_syn_tx = rx_syn_lat;
+assign tcprx_ack_tx = rx_ack_lat;
+assign tcprx_fin_tx = rx_fin_lat;
+assign tcprx_rst_tx = rx_rst_lat;
+assign tcprx_seq_tx = rx_seq_lat;
  
 logic [7:0] tcptx_payload_data; //tcp tx to ip tx
 logic tcptx_payload_valid;
 logic tcptx_payload_ready;
 logic tcptx_done;
- 
+
+logic sess_ctrl_start_lat;
+always_ff @(posedge tx_clk) begin
+    if (rst) sess_ctrl_start_lat <= 0;
+    else if (sess_ctrl_start) sess_ctrl_start_lat <= 1;
+    else if (ethtx_start && tx_is_tcp) sess_ctrl_start_lat <= 0;
+end
+
 logic tcp_start_mux; //mux for ilink and tcp session
 logic [7:0] tcp_flags_mux;
 logic [15:0] tcp_length_mux;
 logic [15:0] tcp_payload_csum_mux;
 logic [31:0] tcp_ack_num_mux;
  
-assign tcp_start_mux = sess_ctrl_start ? sess_ctrl_start : iltx_start;
-assign tcp_flags_mux = sess_ctrl_start ? sess_ctrl_flags : iltx_flags;
-assign tcp_length_mux = sess_ctrl_start ? sess_ctrl_tcp_length : iltx_tcp_length;
-assign tcp_payload_csum_mux = sess_ctrl_start ? sess_ctrl_payload_csum : iltx_payload_csum;
-assign tcp_ack_num_mux = sess_ctrl_start ? sess_ctrl_ack_num : 32'h0;
+assign tcp_start_mux = (sess_ctrl_start || sess_ctrl_start_lat) ? 1'b1 : iltx_start;
+assign tcp_flags_mux = (sess_ctrl_start || sess_ctrl_start_lat) ? sess_ctrl_flags : iltx_flags;
+assign tcp_length_mux = (sess_ctrl_start || sess_ctrl_start_lat) ? sess_ctrl_tcp_length : iltx_tcp_length;
+assign tcp_payload_csum_mux = (sess_ctrl_start || sess_ctrl_start_lat) ? sess_ctrl_payload_csum : iltx_payload_csum;
+assign tcp_ack_num_mux = (sess_ctrl_start || sess_ctrl_start_lat) ? sess_ctrl_ack_num : 32'h0;
  
 assign iltx_payload_ready = sess_ctrl_start ? 1'b0 : tcptx_payload_ready; //tcp session gets priority
 logic [7:0] tcp_pld_data_mux;

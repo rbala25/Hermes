@@ -100,7 +100,7 @@ always_ff @(posedge clk) begin
         load_seq <= 0;
  
         if (ctrl_start) tx_busy <= 1;
-        if (tx_done) tx_busy <= 0;
+        else if (tx_done) tx_busy <= 0;
  
         if (header_valid) begin
               ack_num_r <= rx_seq_num + 32'd1; 

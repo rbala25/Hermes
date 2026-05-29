@@ -64,15 +64,17 @@ logic [5:0] header_len; //actual header length in bytes = data_offset * 4
 logic [5:0] options_remaining;
 logic [7:0] data_offset_raw; //captured hdr[12] for checksum
  
+logic [31:0] csum_acc;
+logic [7:0] csum_byte_hi;
+logic csum_hi_valid;
+ 
+logic [31:0] csum_with_pseudo;
 logic [16:0] csum_fold1;
 logic [15:0] csum_fold2;
  
-logic [31:0] csum_static;
-assign csum_static = {16'h0, src_ip[31:16]} + {16'h0, src_ip[15:0]} + {16'h0, dst_ip[31:16]} + {16'h0, dst_ip[15:0]} + 32'h0006 + {16'h0, tcp_length}
-                   + {16'h0, src_port} + {16'h0, dst_port} + {16'h0, seq_num[31:16]} + {16'h0, seq_num[15:0]} + {16'h0, ack_num[31:16]}
-                   + {16'h0, ack_num[15:0]} + {16'h0, {data_offset_raw, flags}} + {16'h0, window_size} + {16'h0, rx_checksum};
+assign csum_with_pseudo = csum_acc + {16'h0, src_ip[31:16]} + {16'h0, src_ip[15:0]} + {16'h0, dst_ip[31:16]} + {16'h0, dst_ip[15:0]} + 32'h0006 + {16'h0, tcp_length};
  
-assign csum_fold1 = {1'b0, csum_static[15:0]} + {1'b0, csum_static[31:16]};
+assign csum_fold1 = {1'b0, csum_with_pseudo[15:0]} + {1'b0, csum_with_pseudo[31:16]};
 assign csum_fold2 = csum_fold1[15:0] + {15'h0, csum_fold1[16]};
  
 always_ff @(posedge rx_clk) begin
@@ -89,6 +91,9 @@ always_ff @(posedge rx_clk) begin
         header_len <= 0;
         options_remaining <= 0;
         data_offset_raw <= 0;
+        csum_acc <= 0;
+        csum_byte_hi <= 0;
+        csum_hi_valid <= 0;
         payload_data <= 0;
         payload_valid <= 0;
         data_in_ready <= 0;
@@ -111,9 +116,14 @@ always_ff @(posedge rx_clk) begin
             idle: begin
                 payload_valid <= 0;
                 cnt <= 0;
+                csum_acc <= 0;
+                csum_byte_hi <= 0;
+                csum_hi_valid <= 0;
                 data_in_ready <= 1;
                 if (data_in_valid) begin
                     hdr[0] <= data_in;
+                    csum_byte_hi <= data_in;
+                    csum_hi_valid <= 1;
                     cnt <= 1;
                     state <= header;
                 end
@@ -122,18 +132,24 @@ always_ff @(posedge rx_clk) begin
             header: begin
                 data_in_ready <= 1;
                 if (data_in_valid) begin
-                    hdr[cnt] <= data_in; //into header buf
+                    hdr[cnt] <= data_in;
                     cnt <= cnt + 1;
+                    if (csum_hi_valid) begin
+                        csum_acc <= csum_acc + {16'h0, csum_byte_hi, data_in};
+                        csum_hi_valid <= 0;
+                    end else begin
+                        csum_byte_hi <= data_in;
+                        csum_hi_valid <= 1;
+                    end
                     if (cnt == 19) begin
                         src_port <= {hdr[0], hdr[1]};
                         dst_port <= {hdr[2], hdr[3]};
                         seq_num <= {hdr[4], hdr[5], hdr[6], hdr[7]};
                         ack_num <= {hdr[8], hdr[9], hdr[10], hdr[11]};
-                        //hdr[12] upper nibble is data offset in 32-bit words
                         flags <= hdr[13];
                         window_size <= {hdr[14], hdr[15]};
-                        rx_checksum <= {hdr[16], hdr[17]}; //ignore urgent pointer
-                        header_len <= {hdr[12][7:4], 2'b00}; //data_offset * 4 gives header length in bytes
+                        rx_checksum <= {hdr[16], hdr[17]};
+                        header_len <= {hdr[12][7:4], 2'b00};
                         options_remaining <= {hdr[12][7:4], 2'b00} - 6'd20;
                         data_offset_raw <= hdr[12];
                         state <= csum_check;
@@ -161,9 +177,15 @@ always_ff @(posedge rx_clk) begin
             end
  
             options: begin
-                //discarding all option bytes, mss can be ignored
                 data_in_ready <= 1;
                 if (data_in_valid) begin
+                    if (csum_hi_valid) begin
+                        csum_acc <= csum_acc + {16'h0, csum_byte_hi, data_in};
+                        csum_hi_valid <= 0;
+                    end else begin
+                        csum_byte_hi <= data_in;
+                        csum_hi_valid <= 1;
+                    end
                     options_remaining <= options_remaining - 1;
                     if (options_remaining == 1) begin
                         if (tcp_length > header_len)
