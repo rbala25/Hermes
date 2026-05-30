@@ -307,6 +307,13 @@ always_ff @(posedge clk) begin
             hb_cnt <= 0;
         end
         
+        if (!established && state != s_idle) begin
+            state <= s_idle;
+            payload_in_valid <= 0;
+            neg_pending <= 0;
+            est_pending <= 0;
+        end
+        
         if (neg_response) est_pending <= 1; 
         if (estab_ack) begin //neg establish ack
             ilink_established <= 1;

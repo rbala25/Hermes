@@ -1372,6 +1372,7 @@ always_ff @(posedge tx_clk) begin
         tcp_connect_pulse <= 0;
     end else begin
         tcp_connect_pulse <= 0;
+        if (sess_closed) tcp_connect_sent <= 0;
         if (link_ready && !tcp_connect_sent && !sess_established && gateway_mac != 0) begin
             tcp_connect_pulse <= 1;
             tcp_connect_sent <= 1;

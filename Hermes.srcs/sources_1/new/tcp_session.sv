@@ -106,7 +106,7 @@ always_ff @(posedge clk) begin
               ack_num_r <= rx_seq_num + 32'd1; 
         end
  
-        if (rx_rst) begin
+        if (header_valid && rx_rst) begin
             state <= S_CLOSED;
             established <= 0;
             closed <= 1;
