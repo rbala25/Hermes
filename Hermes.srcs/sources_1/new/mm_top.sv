@@ -676,7 +676,7 @@ assign tcp_start_mux = (sess_ctrl_start || sess_ctrl_start_lat) ? 1'b1 : (iltx_s
 assign tcp_flags_mux = (sess_ctrl_start || sess_ctrl_start_lat) ? sess_ctrl_flags : iltx_flags;
 assign tcp_length_mux = (sess_ctrl_start || sess_ctrl_start_lat) ? sess_ctrl_tcp_length : iltx_tcp_length;
 assign tcp_payload_csum_mux = (sess_ctrl_start || sess_ctrl_start_lat) ? sess_ctrl_payload_csum : iltx_payload_csum;
-assign tcp_ack_num_mux = (sess_ctrl_start || sess_ctrl_start_lat) ? sess_ctrl_ack_num : 32'h0;
+assign tcp_ack_num_mux = sess_ctrl_ack_num;
  
 assign iltx_payload_ready = sess_ctrl_start ? 1'b0 : tcptx_payload_ready; //tcp session gets priority
 logic [7:0] tcp_pld_data_mux;
