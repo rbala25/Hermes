@@ -284,6 +284,7 @@ end
  
 assign flags = 8'h18; //always 0x18 (ack and psh) for data
 
+
 always_ff @(posedge clk) begin
     if (rst) begin
         state <= s_idle;
