@@ -1612,9 +1612,20 @@ always_ff @(posedge tx_clk) begin
     else if (ethtx_done) ethtx_done_seen <= 1;
 end
  
+//assign led[0] = link_ready;
+//assign led[1] = tx_en;
+//assign led[2] = sess_start_seen;
+//assign led[3] = ethtx_done_seen;
+
+logic iltx_start_seen;
+always_ff @(posedge tx_clk) begin
+    if (rst_sync_tx) iltx_start_seen <= 0;
+    else if (iltx_start) iltx_start_seen <= 1;
+end
+
 assign led[0] = link_ready;
-assign led[1] = tx_en;
-assign led[2] = sess_start_seen;
+assign led[1] = iltx_start_seen;
+assign led[2] = sess_established;
 assign led[3] = ethtx_done_seen;
  
 endmodule

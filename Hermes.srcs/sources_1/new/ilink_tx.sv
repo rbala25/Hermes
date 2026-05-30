@@ -253,8 +253,9 @@ end
 
 logic [7:0] next_tx_cnt;
 assign next_tx_cnt = (payload_in_ready && state == s_tx && tx_cnt != msg_len - 8'd1) ? tx_cnt + 8'd1 : tx_cnt;
+assign payload_in_last = (state == s_tx) && (tx_cnt == msg_len - 8'd1);
 assign payload_in_data = msg_buf[next_tx_cnt]; //putting bytes on wire
-assign payload_in_last = (state == s_tx) && (next_tx_cnt == msg_len - 8'd1);
+//assign payload_in_last = (state == s_tx) && (next_tx_cnt == msg_len - 8'd1);
  
 assign flags = 8'h18; //always 0x18 (ack and psh) for data
 
