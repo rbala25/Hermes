@@ -174,6 +174,25 @@ logic [207:0] seq_vec; //26 bytes
 logic [1151:0] nos_vec; //144 bytes
 logic [863:0] ocr_vec; //108 bytes
 
+logic [15:0] est_delay;
+logic est_delay_done;
+logic est_delay_done_prev;
+
+always_ff @(posedge clk) begin
+    if (rst) begin
+        est_delay <= 0;
+        est_delay_done <= 0;
+    end else if (established && !established_prev) begin
+        est_delay <= 0;
+        est_delay_done <= 0;
+    end else if (established && !est_delay_done) begin
+        if (est_delay == 16'd25000) est_delay_done <= 1;
+        else est_delay <= est_delay + 1;
+    end else if (!established) begin
+        est_delay_done <= 0;
+    end
+end
+
 logic [7:0] cur_byte;
 always_comb begin
     neg_vec = 0;
@@ -294,18 +313,20 @@ always_ff @(posedge clk) begin
         tcp_length <= 0;
         payload_csum <= 0;
         payload_in_valid <= 0;
+        est_delay_done_prev <= 0;
         start <= 0;
         for (int i = 0; i < 256; i++) msg_buf[i] <= 0;
     end else begin
         start <= 0; 
         
         established_prev <= established;
-        if (established && !established_prev) begin
-            neg_pending <= 1; //negotiate when tcp established
+        est_delay_done_prev <= est_delay_done;
+        if (est_delay_done && !est_delay_done_prev) begin
+            neg_pending <= 1;
             seq_num <= 32'd1;
             ilink_established <= 0;
             hb_cnt <= 0;
-        end
+        end 
         
         if (!established && state != s_idle) begin
             state <= s_idle;

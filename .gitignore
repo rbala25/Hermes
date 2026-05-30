@@ -1,7 +1,5 @@
-# Claude
 .claude/
 
-# Vivado generated
 *.cache/
 *.runs/
 *.ip_user_files/
