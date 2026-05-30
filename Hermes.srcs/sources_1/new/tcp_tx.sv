@@ -154,7 +154,6 @@ always_ff @(posedge tx_clk) begin
                     if (payload_in_last) begin
                         seq_num <= seq_num + {16'h0, byte_cnt} + 16'd1 + (flags[1] ? 32'd1 : 32'd0) + (flags[0] ? 32'd1 : 32'd0);
                         done <= 1;
-                        payload_valid <= 0;
                         state <= idle;
                     end
                 end
