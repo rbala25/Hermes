@@ -63,15 +63,14 @@ module mm_top #(
     output logic eth_mdc,
     output logic eth_mdio   
 );
-
+ 
 logic locked;
-
 clk_gen u_clk_gen (
     .clk_100(clk_100),
     .clk_25(eth_ref_clk),
     .locked(locked)
 );
-
+ 
 logic [19:0] rst_cnt;
 logic phy_rstn;
 always_ff @(posedge clk_100) begin
@@ -84,6 +83,18 @@ always_ff @(posedge clk_100) begin
     end
 end
 assign eth_rstn = phy_rstn;
+ 
+logic rst_sync_tx_0, rst_sync_tx;
+logic rst_sync_rx_0, rst_sync_rx;
+always_ff @(posedge tx_clk) begin
+    rst_sync_tx_0 <= rst || !locked;
+    rst_sync_tx <= rst_sync_tx_0;
+end
+always_ff @(posedge rx_clk) begin
+    rst_sync_rx_0 <= rst || !locked;
+    rst_sync_rx <= rst_sync_rx_0;
+end
+ 
 logic link_ready;
  
 logic [7:0] mii_rx_data; //mii rx outputs
@@ -205,7 +216,7 @@ logic [15:0] rep_ip_id;
 logic [15:0] rep_icmp_checksum_rx;
  
 always_ff @(posedge rx_clk) begin
-    if (rst) begin
+    if (rst_sync_rx) begin
         rep_dst_mac <= 0;
         rep_dst_ip <= 0;
         rep_identifier <= 0;
@@ -232,7 +243,7 @@ logic [ICMP_FIFO_AW-1:0] icmp_fifo_rd_ptr;
  
 logic [ICMP_FIFO_AW-1:0] icmp_wr_snap_meta, icmp_wr_snap_tx;
 always_ff @(posedge tx_clk) begin
-    if (rst) begin
+    if (rst_sync_tx) begin
         icmp_wr_snap_meta <= 0;
         icmp_wr_snap_tx <= 0;
     end else begin
@@ -249,12 +260,12 @@ logic icmp_fifo_rst_wr;
 logic icmp_fifo_rst_meta, icmp_fifo_rst_tx, icmp_fifo_rst_tx_r;
  
 always_ff @(posedge rx_clk) begin
-    if (rst) icmp_fifo_rst_wr <= 0;
+    if (rst_sync_rx) icmp_fifo_rst_wr <= 0;
     else icmp_fifo_rst_wr <= (icmp_header_valid && icmp_type == 8'h08 && icmp_code == 8'h00);
 end
  
 always_ff @(posedge tx_clk) begin
-    if (rst) begin
+    if (rst_sync_tx) begin
         icmp_fifo_rst_meta <= 0;
         icmp_fifo_rst_tx <= 0;
         icmp_fifo_rst_tx_r <= 0;
@@ -269,7 +280,7 @@ logic icmp_fifo_rd_rst;
 assign icmp_fifo_rd_rst = icmp_fifo_rst_tx && !icmp_fifo_rst_tx_r;
  
 always_ff @(posedge rx_clk) begin
-    if (rst) icmp_fifo_wr_ptr <= 0;
+    if (rst_sync_rx) icmp_fifo_wr_ptr <= 0;
     else if (icmp_header_valid && icmp_type == 8'h08 && icmp_code == 8'h00) icmp_fifo_wr_ptr <= 0;
     else if (icmp_payload_valid) begin
         icmp_fifo_mem[icmp_fifo_wr_ptr] <= icmp_payload_data;
@@ -278,7 +289,7 @@ always_ff @(posedge rx_clk) begin
 end
  
 always_ff @(posedge tx_clk) begin
-    if (rst) icmp_fifo_rd_ptr <= 0;
+    if (rst_sync_tx) icmp_fifo_rd_ptr <= 0;
     else if (icmp_fifo_rd_rst) icmp_fifo_rd_ptr <= 0;
     else if (icmp_fifo_valid_tx && icmp_fifo_ready) icmp_fifo_rd_ptr <= icmp_fifo_rd_ptr + 1;
 end
@@ -334,7 +345,7 @@ logic [MD2_FIFO_AW-1:0] md2_rd_ptr;
  
 logic [MD2_FIFO_AW-1:0] md2_wr_ptr_meta, md2_wr_ptr_tx;
 always_ff @(posedge tx_clk) begin //metastability
-    if (rst) begin
+    if (rst_sync_tx) begin
         md2_wr_ptr_meta <= 0;
         md2_wr_ptr_tx <= 0;
     end else begin
@@ -347,7 +358,7 @@ logic md2_fifo_not_empty;
 assign md2_fifo_not_empty = (md2_rd_ptr != md2_wr_ptr_tx);
  
 always_ff @(posedge rx_clk) begin
-    if (rst) begin
+    if (rst_sync_rx) begin
         md2_wr_ptr <= 0;
     end else if (ob_book_valid && (mdp_entry_valid || mdp_trade_valid)) begin //check condition
         md2_fifo_mem[md2_wr_ptr] <= {
@@ -392,7 +403,7 @@ logic [31:0] mm_trade_size_r;
 logic [1:0] mm_trade_aggressor_r;
  
 always_ff @(posedge tx_clk) begin
-    if (rst) begin
+    if (rst_sync_tx) begin
         md2_rd_ptr <= 0;
         mm_book_valid_r <= 0;
         mm_best_bid_price_r <= 0;
@@ -430,7 +441,7 @@ logic [FILL_FIFO_AW-1:0] fill_rd_ptr;
  
 logic [FILL_FIFO_AW-1:0] fill_wr_ptr_meta, fill_wr_ptr_tx;
 always_ff @(posedge tx_clk) begin //same thing lol
-    if (rst) begin
+    if (rst_sync_tx) begin
         fill_wr_ptr_meta <= 0;
         fill_wr_ptr_tx <= 0;
     end else begin
@@ -443,7 +454,7 @@ logic fill_fifo_not_empty;
 assign fill_fifo_not_empty = (fill_rd_ptr != fill_wr_ptr_tx);
  
 always_ff @(posedge rx_clk) begin
-    if (rst) begin
+    if (rst_sync_rx) begin
         fill_wr_ptr <= 0;
     end else if (ilrx_exec_trade) begin
         fill_fifo_mem[fill_wr_ptr] <= {
@@ -471,7 +482,7 @@ logic [31:0] mm_fill_size;
 logic mm_fill_side;
  
 always_ff @(posedge tx_clk) begin
-    if (rst) begin
+    if (rst_sync_tx) begin
         fill_rd_ptr <= 0;
         mm_fill_valid <= 0;
         mm_fill_price <= 0;
@@ -490,7 +501,7 @@ end
  
 logic neg_response_meta, neg_response_tx; //synchronizing response pulses for ilink tx
 always_ff @(posedge tx_clk) begin
-    if (rst) begin
+    if (rst_sync_tx) begin
         neg_response_meta <= 0;
         neg_response_tx <= 0;
     end else begin
@@ -501,7 +512,7 @@ end
  
 logic estab_ack_meta, estab_ack_tx; //estab_ack pulse sync
 always_ff @(posedge tx_clk) begin
-    if (rst) begin
+    if (rst_sync_tx) begin
         estab_ack_meta <= 0;
         estab_ack_tx <= 0;
     end else begin
@@ -512,7 +523,7 @@ end
  
 logic send_sequence_meta, send_sequence_tx;
 always_ff @(posedge tx_clk) begin
-    if (rst) begin
+    if (rst_sync_tx) begin
         send_sequence_meta <= 0;
         send_sequence_tx <= 0;
     end else begin
@@ -524,7 +535,7 @@ end
 logic [63:0] bid_order_id_meta, bid_order_id_tx;
 logic [63:0] ask_order_id_meta, ask_order_id_tx;
 always_ff @(posedge tx_clk) begin
-    if (rst) begin
+    if (rst_sync_tx) begin
         bid_order_id_meta <= 0;
         bid_order_id_tx <= 0;
         ask_order_id_meta <= 0;
@@ -539,7 +550,7 @@ end
  
 logic session_error_meta, session_error_tx;
 always_ff @(posedge tx_clk) begin
-    if (rst) begin
+    if (rst_sync_tx) begin
         session_error_meta <= 0;
         session_error_tx <= 0;
     end else begin
@@ -590,9 +601,9 @@ logic sess_closed;
 logic rx_syn_lat, rx_ack_lat, rx_fin_lat, rx_rst_lat;
 logic [31:0] rx_seq_lat;
 logic rx_hv_toggle;
-
+ 
 always_ff @(posedge rx_clk) begin
-    if (rst) begin
+    if (rst_sync_rx) begin
         rx_syn_lat <= 0;
         rx_ack_lat <= 0;
         rx_fin_lat <= 0;
@@ -608,10 +619,10 @@ always_ff @(posedge rx_clk) begin
         rx_hv_toggle <= ~rx_hv_toggle;
     end
 end
-
+ 
 logic rx_hv_tog_meta, rx_hv_tog_tx, rx_hv_tog_tx_r;
 always_ff @(posedge tx_clk) begin
-    if (rst) begin
+    if (rst_sync_tx) begin
         rx_hv_tog_meta <= 0;
         rx_hv_tog_tx <= 0;
         rx_hv_tog_tx_r <= 0;
@@ -621,14 +632,14 @@ always_ff @(posedge tx_clk) begin
         rx_hv_tog_tx_r <= rx_hv_tog_tx;
     end
 end
-
+ 
 logic tcprx_hv_tx;
 logic tcprx_syn_tx;
 logic tcprx_ack_tx;
 logic tcprx_fin_tx;
 logic tcprx_rst_tx;
 logic [31:0] tcprx_seq_tx;
-
+ 
 assign tcprx_hv_tx = rx_hv_tog_tx ^ rx_hv_tog_tx_r;
 assign tcprx_syn_tx = rx_syn_lat;
 assign tcprx_ack_tx = rx_ack_lat;
@@ -640,14 +651,14 @@ logic [7:0] tcptx_payload_data; //tcp tx to ip tx
 logic tcptx_payload_valid;
 logic tcptx_payload_ready;
 logic tcptx_done;
-
+ 
 logic sess_ctrl_start_lat;
 always_ff @(posedge tx_clk) begin
-    if (rst) sess_ctrl_start_lat <= 0;
+    if (rst_sync_tx) sess_ctrl_start_lat <= 0;
     else if (sess_ctrl_start) sess_ctrl_start_lat <= 1;
     else if (ethtx_start && tx_is_tcp) sess_ctrl_start_lat <= 0;
 end
-
+ 
 logic tcp_start_mux; //mux for ilink and tcp session
 logic [7:0] tcp_flags_mux;
 logic [15:0] tcp_length_mux;
@@ -690,10 +701,10 @@ logic arp_payload_ready;
  
 logic tx_is_arp;
 logic tx_is_tcp;
-
+ 
 logic [47:0] gateway_mac;
 always_ff @(posedge tx_clk) begin
-    if (rst) gateway_mac <= 0;
+    if (rst_sync_tx) gateway_mac <= 0;
     else if (arp_pending && arp_reply_dst_mac != 0) gateway_mac <= arp_reply_dst_mac;
 end
  
@@ -741,7 +752,7 @@ logic icmp_tx_start;
  
 logic tcp_pending;
 always_ff @(posedge tx_clk) begin
-    if (rst || !link_ready) begin
+    if (rst_sync_tx || !link_ready) begin
         tcp_pending <= 0;
     end else begin
         if (tx_state == TX_IDLE && tcp_pending) tcp_pending <= 0;
@@ -750,7 +761,7 @@ always_ff @(posedge tx_clk) begin
 end
  
 always_ff @(posedge tx_clk) begin
-    if (rst) begin
+    if (rst_sync_tx) begin
         tx_state <= TX_IDLE;
         ethtx_start <= 0;
         arp_start <= 0;
@@ -790,11 +801,11 @@ always_ff @(posedge tx_clk) begin
 end
  
 //assign uart_tx = 1'b1; //temp until i wire uart module
-
+ 
 logic [7:0] baud_cnt;
 logic baud_tick;
 always_ff @(posedge tx_clk) begin
-    if (rst) begin
+    if (rst_sync_tx) begin
         baud_cnt <= 0;
         baud_tick <= 0;
     end else begin
@@ -807,11 +818,11 @@ always_ff @(posedge tx_clk) begin
         end
     end
 end
-
+ 
 logic [24:0] hb_cnt; //1s uart heartbeat, fill has priority
 logic hb_tick;
 always_ff @(posedge tx_clk) begin
-    if (rst) begin
+    if (rst_sync_tx) begin
         hb_cnt <= 0;
         hb_tick <= 0;
     end else begin
@@ -824,35 +835,35 @@ always_ff @(posedge tx_clk) begin
         end
     end
 end
-
+ 
 function automatic logic [7:0] hex_char(input logic [3:0] nibble);
     return (nibble < 4'd10) ? (8'h30 + {4'h0, nibble}) : (8'h41 + {4'h0, nibble} - 8'd10);
 endfunction
-
+ 
 typedef enum logic [1:0] { //uart state machine
     UART_IDLE,
     UART_FILL,
     UART_STATUS
 } uart_state_t;
 uart_state_t uart_state;
-
+ 
 logic [7:0] uart_data;
 logic uart_ready;
 logic [3:0] uart_seq;
 logic [31:0] uart_price_latch;
 logic uart_side_latch;
 logic uart_busy; 
-
+ 
 logic uart_tx_done;
 logic uart_tx_done_r;
-
+ 
 always_ff @(posedge tx_clk) begin
-    if (rst) uart_tx_done_r <= 0;
+    if (rst_sync_tx) uart_tx_done_r <= 0;
     else uart_tx_done_r <= uart_tx_done; //defensive
 end
-
+ 
 always_ff @(posedge tx_clk) begin
-    if (rst) begin
+    if (rst_sync_tx) begin
         uart_data <= 0;
         uart_ready <= 0;
         uart_seq <= 0;
@@ -873,7 +884,7 @@ always_ff @(posedge tx_clk) begin
                     uart_state <= UART_STATUS;
                 end
             end
-
+ 
             UART_FILL: begin
                 if ((uart_seq == 0 && !uart_busy) || (uart_seq > 0 && uart_tx_done_r)) begin
                     case (uart_seq)
@@ -940,9 +951,9 @@ always_ff @(posedge tx_clk) begin
         endcase
     end
 end
-
+ 
 //always_ff @(posedge tx_clk) begin
-//    if (rst) begin
+//    if (rst_sync_tx) begin
 //        uart_data <= 0;
 //        uart_ready <= 0;
 //        uart_seq <= 0;
@@ -979,16 +990,16 @@ end
 //        endcase
 //    end
 //end
-
+ 
 //assign led[0] = uart_busy;
-
+ 
 logic [15:0] tcp_length_lat;
 logic [7:0] tcp_flags_lat;
 logic [31:0] tcp_ack_num_lat;
 logic [15:0] tcp_payload_csum_lat;
-
+ 
 always_ff @(posedge tx_clk) begin
-    if (rst) begin
+    if (rst_sync_tx) begin
         tcp_length_lat <= 0;
         tcp_flags_lat <= 0;
         tcp_ack_num_lat <= 0;
@@ -1000,10 +1011,10 @@ always_ff @(posedge tx_clk) begin
         tcp_payload_csum_lat <= tcp_payload_csum_mux;
     end
 end
-
+ 
 logic link_ready_rx_meta, link_ready_rx;
 always_ff @(posedge rx_clk) begin
-    if (rst) begin
+    if (rst_sync_rx) begin
         link_ready_rx_meta <= 0;
         link_ready_rx <= 0;
     end else begin
@@ -1011,10 +1022,10 @@ always_ff @(posedge rx_clk) begin
         link_ready_rx <= link_ready_rx_meta;
     end
 end
-
+ 
 uarttx u_uarttx (
     .clk(tx_clk),
-    .rst(rst),
+    .rst(rst_sync_tx),
     .baud(baud_tick),
     .data(uart_data),
     .ready(uart_ready),
@@ -1022,7 +1033,7 @@ uarttx u_uarttx (
     .tx_done(uart_tx_done),
     .tx(uart_tx)
 );
-
+ 
 logic mdio_done;
 mdio_init u_mdio_init (
     .clk(clk_100),
@@ -1031,17 +1042,17 @@ mdio_init u_mdio_init (
     .mdio(eth_mdio),
     .done(mdio_done)
 );
-
+ 
 //assign eth_mdc = 0;
 //assign eth_mdio = 1;
 //assign mdio_done = 1;
-
+ 
 mii_rx u_mii_rx (
     .rxclk(rx_clk),
     .rxd(rxd),
     .rx_dv(rx_dv),
     .rx_er(1'b0),
-    .rst(rst || !link_ready_rx),
+    .rst(rst_sync_rx || !link_ready_rx),
     .data(mii_rx_data),
     .valid(mii_rx_valid),
     .frame_active(mii_rx_frame_active)
@@ -1049,7 +1060,7 @@ mii_rx u_mii_rx (
  
 eth_parser u_eth_parser (
     .clk(rx_clk),
-    .rst(rst),
+    .rst(rst_sync_rx),
     .data(mii_rx_data),
     .valid(mii_rx_valid),
     .frame_active(mii_rx_frame_active),
@@ -1065,7 +1076,7 @@ eth_parser u_eth_parser (
  
 ip_parser u_ip_parser (
     .clk(rx_clk),
-    .rst(rst),
+    .rst(rst_sync_rx),
     .payload(eth_payload_data),
     .payload_valid(eth_payload_valid),
     .header_valid(eth_header_valid),
@@ -1095,7 +1106,7 @@ ip_parser u_ip_parser (
  
 udp_parser u_udp_parser (
     .clk(rx_clk),
-    .rst(rst),
+    .rst(rst_sync_rx),
     .payload_data(ip_payload_data),
     .payload_valid(ip_payload_valid && (ip_protocol == 8'h11)),
     .ip_header_valid(ip_header_valid),
@@ -1121,7 +1132,7 @@ mdp_parser #(
     .sec_id(SEC_ID)
 ) u_mdp_parser (
     .clk(rx_clk),
-    .rst(rst),
+    .rst(rst_sync_rx),
     .udp_payload(udp_payload),
     .udp_payload_valid(udp_payload_valid),
     .udp_payload_done(udp_payload_done),
@@ -1148,7 +1159,7 @@ mdp_parser #(
  
 order_book u_order_book (
     .clk(rx_clk),
-    .rst(rst),
+    .rst(rst_sync_rx),
     .entry_price(mdp_entry_price),
     .entry_size(mdp_entry_size),
     .entry_price_level(mdp_entry_price_level),
@@ -1173,7 +1184,7 @@ order_book u_order_book (
  
 icmp_parser u_icmp_parser (
     .clk(rx_clk),
-    .rst(rst),
+    .rst(rst_sync_rx),
     .payload(ip_payload_data),
     .payload_valid(ip_payload_valid),
     .ip_header_valid(ip_header_valid),
@@ -1195,7 +1206,7 @@ icmp_parser u_icmp_parser (
  
 tcp_rx u_tcp_rx (
     .rx_clk(rx_clk),
-    .rst(rst),
+    .rst(rst_sync_rx),
     .src_ip(ip_src),
     .dst_ip(ip_dest),
     .tcp_length(tcp_segment_length),
@@ -1222,7 +1233,7 @@ tcp_rx u_tcp_rx (
  
 ilink_rx u_ilink_rx (
     .clk(rx_clk),
-    .rst(rst),
+    .rst(rst_sync_rx),
     .payload_data(tcprx_payload_data),
     .payload_valid(tcprx_payload_valid),
     .payload_ready(ilrx_payload_ready),
@@ -1278,7 +1289,7 @@ mm_core #(
     .OFI_THRESHOLD(OFI_THRESHOLD)
 ) u_mm_core (
     .clk(tx_clk),
-    .rst(rst),
+    .rst(rst_sync_tx),
     .best_bid_price(mm_best_bid_price_r),
     .best_bid_size(mm_best_bid_size_r),
     .best_ask_price(mm_best_ask_price_r),
@@ -1314,7 +1325,7 @@ mm_core #(
 //logic tcp_connect_sent; //send once
 //logic tcp_connect_pulse;
 //always_ff @(posedge tx_clk) begin
-//    if (rst) begin
+//    if (rst_sync_tx) begin
 //        tcp_connect_sent <= 0;
 //        tcp_connect_pulse <= 0;
 //    end else begin
@@ -1325,14 +1336,14 @@ mm_core #(
 //        end
 //    end
 //end
-
+ 
 logic tcp_connect_sent;
 logic tcp_connect_pulse;
 logic [26:0] link_delay;
 //logic link_ready;
-
+ 
 always_ff @(posedge tx_clk) begin
-    if (rst) begin
+    if (rst_sync_tx) begin
         link_delay <= 0;
         link_ready <= 0;
     end else if (!link_ready) begin
@@ -1340,9 +1351,9 @@ always_ff @(posedge tx_clk) begin
         if (link_delay == 27'd74999999) link_ready <= 1;
     end
 end
-
+ 
 //always_ff @(posedge tx_clk) begin
-//    if (rst) begin
+//    if (rst_sync_tx) begin
 //        tcp_connect_sent <= 0;
 ////        tcp_connect_sent <= 1; //test
 //        tcp_connect_pulse <= 0;
@@ -1354,9 +1365,9 @@ end
 //        end
 //    end
 //end
-
+ 
 always_ff @(posedge tx_clk) begin
-    if (rst) begin
+    if (rst_sync_tx) begin
         tcp_connect_sent <= 0;
         tcp_connect_pulse <= 0;
     end else begin
@@ -1373,7 +1384,7 @@ tcp_session #(
     .KEEPALIVE_CYCLES(KEEPALIVE_CYCLES)
 ) u_tcp_session (
     .clk(tx_clk),
-    .rst(rst),
+    .rst(rst_sync_tx),
     .connect(tcp_connect_pulse),
     .disconnect(1'b0),
     .src_port(SRC_PORT),
@@ -1401,7 +1412,7 @@ tcp_session #(
  
 ilink_tx u_ilink_tx (
     .clk(tx_clk),
-    .rst(rst),
+    .rst(rst_sync_tx),
     .established(sess_established),
     .hmac_negotiate(HMAC_NEGOTIATE),
     .hmac_establish(HMAC_ESTABLISH),
@@ -1441,7 +1452,7 @@ icmp_csum_adjust u_csum_adjust (
  
 icmp_tx u_icmp_tx (
     .tx_clk(tx_clk),
-    .rst(rst),
+    .rst(rst_sync_tx),
     .identifier(rep_identifier),
     .seq(rep_seq),
     .icmp_checksum(icmp_checksum_tx),
@@ -1457,7 +1468,7 @@ icmp_tx u_icmp_tx (
  
 tcp_tx u_tcp_tx (
     .tx_clk(tx_clk),
-    .rst(rst),
+    .rst(rst_sync_tx),
     .src_ip(MY_IP),
     .dst_ip(CME_IP),
     .tcp_length(tcp_length_lat),
@@ -1479,17 +1490,16 @@ tcp_tx u_tcp_tx (
     .payload_valid(tcptx_payload_valid),
     .payload_ready(ip_payload_mux_ready)
 );
-
+ 
 logic [15:0] ip_total_len_lat;
 always_ff @(posedge tx_clk) begin
-    if (rst) ip_total_len_lat <= 0;
+    if (rst_sync_tx) ip_total_len_lat <= 0;
     else if (sess_ctrl_start || iltx_start) ip_total_len_lat <= tcp_length_mux + 16'd20;
-    else if (icmp_tx_start) ip_total_len_lat <= rep_total_len;
 end
  
 ip_tx u_ip_tx (
     .tx_clk(tx_clk),
-    .rst(rst),
+    .rst(rst_sync_tx),
     .src_ip(MY_IP),
     .dst_ip(ip_dst_mux),
     .protocol(ip_protocol_mux),
@@ -1507,7 +1517,7 @@ ip_tx u_ip_tx (
  
 eth_tx u_eth_tx (
     .tx_clk(tx_clk),
-    .rst(rst || !link_ready),
+    .rst(rst_sync_tx || !link_ready),
     .dst_mac(mux_dst_mac),
     .ether_type(mux_ether_type),
     .payload_data(mux_payload_data),
@@ -1522,7 +1532,7 @@ eth_tx u_eth_tx (
  
 mii_tx u_mii_tx (
     .tx_clk(tx_clk),
-    .rst(rst || !link_ready),
+    .rst(rst_sync_tx || !link_ready),
     .data(ethtx_data),
     .valid(ethtx_valid),
     .ready(ethtx_ready),
@@ -1551,59 +1561,59 @@ arp_handler #(
     .payload_valid(arp_payload_valid),
     .payload_ready(arp_payload_ready)
 );
-
+ 
 //DEBUG LEDS
 //assign led[0] = session_error_tx; //ilink session error
 //assign led[1] = ob_gap_detected; //order book gap
 //assign led[2] = ilrx_exec_trade; //fill received
 //assign led[3] = ob_book_valid; //book live
-
+ 
 //assign led[0] = arp_pending;
 //assign led[1] = tcp_pending;
 //assign led[2] = icmp_fifo_valid_tx;
 //assign led[3] = tx_is_arp;
-
+ 
 //assign led[0] = ethtx_start;
 //assign led[1] = ethtx_valid;
 //assign led[2] = tx_is_tcp;
 //assign led[3] = tx_is_arp;
-
+ 
 //assign led[0] = mdio_done;
 //assign led[1] = sess_ctrl_start;
 //assign led[2] = tcp_connect_pulse;
 //assign led[3] = link_ready;
-
+ 
 //assign led[0] = link_ready;
 //assign led[1] = arp_pending;
 //assign led[2] = icmp_fifo_valid_tx;
 //assign led[3] = tx_en;
-
+ 
 //assign led[0] = link_ready;
 //assign led[1] = tx_en;
 //assign led[2] = sess_ctrl_start;
 //assign led[3] = tcp_connect_pulse;
-
+ 
 logic tcp_pulse_seen;
 always_ff @(posedge tx_clk) begin
-    if (rst) tcp_pulse_seen <= 0;
+    if (rst_sync_tx) tcp_pulse_seen <= 0;
     else if (tcp_connect_pulse) tcp_pulse_seen <= 1;
 end
-
+ 
 logic sess_start_seen;
 always_ff @(posedge tx_clk) begin
-    if (rst) sess_start_seen <= 0;
+    if (rst_sync_tx) sess_start_seen <= 0;
     else if (sess_ctrl_start) sess_start_seen <= 1;
 end
-
+ 
 logic ethtx_done_seen;
 always_ff @(posedge tx_clk) begin
-    if (rst) ethtx_done_seen <= 0;
+    if (rst_sync_tx) ethtx_done_seen <= 0;
     else if (ethtx_done) ethtx_done_seen <= 1;
 end
-
+ 
 assign led[0] = link_ready;
 assign led[1] = tx_en;
 assign led[2] = sess_start_seen;
 assign led[3] = ethtx_done_seen;
-
+ 
 endmodule
