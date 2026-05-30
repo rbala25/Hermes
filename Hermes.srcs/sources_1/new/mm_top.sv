@@ -65,6 +65,7 @@ module mm_top #(
 );
 
 logic locked;
+
 clk_gen u_clk_gen (
     .clk_100(clk_100),
     .clk_25(eth_ref_clk),
