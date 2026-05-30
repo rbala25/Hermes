@@ -1495,6 +1495,7 @@ logic [15:0] ip_total_len_lat;
 always_ff @(posedge tx_clk) begin
     if (rst_sync_tx) ip_total_len_lat <= 0;
     else if (sess_ctrl_start || iltx_start) ip_total_len_lat <= tcp_length_mux + 16'd20;
+    else if (icmp_tx_start) ip_total_len_lat <= rep_total_len;
 end
  
 ip_tx u_ip_tx (
