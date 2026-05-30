@@ -20,8 +20,9 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
+
 module tcp_rx(
-    input logic rx_clk,
+        input logic rx_clk,
     input logic rst,
  
     input logic [31:0] src_ip,
@@ -79,6 +80,18 @@ assign csum_with_pseudo = csum_acc
  
 assign csum_fold1 = {1'b0, csum_with_pseudo[15:0]} + {1'b0, csum_with_pseudo[31:16]};
 assign csum_fold2 = csum_fold1[15:0] + {15'h0, csum_fold1[16]};
+ 
+logic [31:0] csum_acc_imm;
+assign csum_acc_imm = csum_acc + {16'h0, csum_byte_hi, data_in};
+logic [31:0] csum_with_pseudo_imm;
+assign csum_with_pseudo_imm = csum_acc_imm
+    + {16'h0, src_ip[31:16]} + {16'h0, src_ip[15:0]}
+    + {16'h0, dst_ip[31:16]} + {16'h0, dst_ip[15:0]}
+    + 32'h0006 + {16'h0, tcp_length};
+logic [16:0] csum_fold1_imm;
+assign csum_fold1_imm = {1'b0, csum_with_pseudo_imm[15:0]} + {1'b0, csum_with_pseudo_imm[31:16]};
+logic [15:0] csum_fold2_imm;
+assign csum_fold2_imm = csum_fold1_imm[15:0] + {15'h0, csum_fold1_imm[16]};
  
 always_ff @(posedge rx_clk) begin
     if (rst) begin
@@ -155,7 +168,24 @@ always_ff @(posedge rx_clk) begin
                         header_len <= {hdr[12][7:4], 2'b00};
                         options_remaining <= {hdr[12][7:4], 2'b00} - 6'd20;
                         data_offset_raw <= hdr[12];
-                        state <= csum_check;
+                        if ({hdr[12][7:4], 2'b00} > 6'd20) begin
+                            state <= options;
+                        end else begin
+                            if (csum_fold2_imm == 16'hFFFF || tcp_length > {10'b0, hdr[12][7:4], 2'b00}) begin
+                                header_valid <= 1;
+                                rx_syn <= hdr[13][1];
+                                rx_ack <= hdr[13][4];
+                                rx_fin <= hdr[13][0];
+                                rx_rst <= hdr[13][2];
+                                if (tcp_length > {10'b0, hdr[12][7:4], 2'b00})
+                                    state <= payload_state;
+                                else
+                                    state <= idle;
+                            end else begin
+                                csum_error <= 1;
+                                state <= idle;
+                            end
+                        end
                     end
                 end
             end
@@ -164,7 +194,7 @@ always_ff @(posedge rx_clk) begin
                 if (options_remaining > 0)
                     state <= options;
                 else begin
-                    if (csum_fold2 == 16'hFFFF || tcp_length > header_len) begin
+                    if (csum_fold2 == 16'hFFFF) begin
                         header_valid <= 1;
                         rx_syn <= flags[1];
                         rx_ack <= flags[4];
@@ -192,13 +222,27 @@ always_ff @(posedge rx_clk) begin
                         csum_hi_valid <= 1;
                     end
                     options_remaining <= options_remaining - 1;
-                    if (options_remaining == 1)
-                        state <= csum_final;
+                    if (options_remaining == 1) begin
+                        if (csum_fold2_imm == 16'hFFFF || tcp_length > {10'b0, header_len}) begin
+                            header_valid <= 1;
+                            rx_syn <= flags[1];
+                            rx_ack <= flags[4];
+                            rx_fin <= flags[0];
+                            rx_rst <= flags[2];
+                            if (tcp_length > {10'b0, header_len})
+                                state <= payload_state;
+                            else
+                                state <= idle;
+                        end else begin
+                            csum_error <= 1;
+                            state <= idle;
+                        end
+                    end
                 end
             end
  
             csum_final: begin
-                if (csum_fold2 == 16'hFFFF || tcp_length > header_len) begin
+                if (csum_fold2 == 16'hFFFF) begin
                     header_valid <= 1;
                     rx_syn <= flags[1];
                     rx_ack <= flags[4];
@@ -229,3 +273,4 @@ always_ff @(posedge rx_clk) begin
     end
 end
 endmodule
+ 

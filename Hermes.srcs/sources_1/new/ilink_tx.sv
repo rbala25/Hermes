@@ -499,8 +499,11 @@ always_ff @(posedge clk) begin
             end
             
             s_wait_done: begin
-                if (tx_done) state <= s_idle; //one cycle for timing
-            end
+                if (tx_done) begin
+                    state <= s_idle;
+                    if (cur_msg == mtype_negotiate) est_pending <= 1;
+                end
+            end 
             
             default: state <= s_idle;
         endcase

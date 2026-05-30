@@ -1636,22 +1636,58 @@ end
 //assign led[2] = sess_start_seen;
 //assign led[3] = ethtx_done_seen;
 
-logic iltx_start_seen;
+//logic iltx_start_seen;
+//always_ff @(posedge tx_clk) begin
+//    if (rst_sync_tx) iltx_start_seen <= 0;
+//    else if (iltx_start) iltx_start_seen <= 1;
+//end
+
+//assign led[0] = link_ready;
+//assign led[1] = iltx_start_seen;
+//assign led[2] = sess_established;
+////assign led[3] = ethtx_done_seen;
+
+//logic csum_err_seen;
+//always_ff @(posedge rx_clk) begin
+//    if (rst_sync_rx) csum_err_seen <= 0;
+//    else if (tcprx_csum_error) csum_err_seen <= 1;
+//end
+//assign led[3] = csum_err_seen;
+
+//logic neg_resp_tx_seen;
+//always_ff @(posedge tx_clk) begin
+//    if (rst_sync_tx) neg_resp_tx_seen <= 0;
+//    else if (neg_response_tx) neg_resp_tx_seen <= 1;
+//end
+
+logic [1:0] iltx_start_cnt;
 always_ff @(posedge tx_clk) begin
-    if (rst_sync_tx) iltx_start_seen <= 0;
-    else if (iltx_start) iltx_start_seen <= 1;
+    if (rst_sync_tx) iltx_start_cnt <= 0;
+    else if (iltx_start && iltx_start_cnt != 2'b11) iltx_start_cnt <= iltx_start_cnt + 1;
 end
 
 assign led[0] = link_ready;
-assign led[1] = iltx_start_seen;
+//assign led[1] = neg_resp_tx_seen;
 assign led[2] = sess_established;
-//assign led[3] = ethtx_done_seen;
-
-logic csum_err_seen;
+assign led[3] = iltx_start_cnt[1]; 
+ 
+logic ilrx_neg_resp_seen;
 always_ff @(posedge rx_clk) begin
-    if (rst_sync_rx) csum_err_seen <= 0;
-    else if (tcprx_csum_error) csum_err_seen <= 1;
+    if (rst_sync_rx) ilrx_neg_resp_seen <= 0;
+    else if (ilrx_neg_response) ilrx_neg_resp_seen <= 1;
 end
-assign led[3] = csum_err_seen;
+
+logic ilrx_neg_resp_seen_meta, ilrx_neg_resp_seen_tx;
+always_ff @(posedge tx_clk) begin
+    if (rst_sync_tx) begin
+        ilrx_neg_resp_seen_meta <= 0;
+        ilrx_neg_resp_seen_tx <= 0;
+    end else begin
+        ilrx_neg_resp_seen_meta <= ilrx_neg_resp_seen;
+        ilrx_neg_resp_seen_tx <= ilrx_neg_resp_seen_meta;
+    end
+end
+
+assign led[1] = ilrx_neg_resp_seen_tx;
  
 endmodule
