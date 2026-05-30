@@ -1,6 +1,6 @@
 # Hermes
 
-Hermes is a hardware-accelerated market making engine built entirely on an FPGA.
+**Hermes** is a hardware-accelerated market making engine built entirely on an FPGA.
 
 It receives live CME MDP 3.0 market data directly from Ethernet, reconstructs a real-time order book in hardware, computes fair value from market microstructure signals, and submits quotes back to the exchange over iLink3/FIXP — all with deterministic latency and no CPU in the execution path.
 
@@ -31,7 +31,9 @@ Ethernet / IPv4 / UDP
  TCP / IP / Ethernet
 ```
 
-Incoming multicast market data is parsed directly on the FPGA. Book state updates in real time, pricing is recomputed continuously, and orders are serialized back onto the wire without software intervention.
+Incoming market data is parsed directly on the FPGA. Book state updates in real time, fair value is recomputed continuously, and quotes are serialized back onto the wire as exchange-native order entry messages.
+
+The full receive-to-transmit trading path runs entirely in hardware.
 
 ---
 
@@ -41,7 +43,7 @@ Hermes includes a hardware parser for CME **MDP 3.0** multicast market data with
 
 Market data updates feed into an on-chip **10-level bid/ask order book**, maintained in real time. The book tracks price and size at each level, validates packet sequencing, detects feed gaps, and resynchronizes from snapshot data when needed.
 
-This order book acts as the core state store for the strategy engine and is updated directly from the exchange feed at line rate.
+This order book acts as the core state store for the strategy engine.
 
 ---
 
@@ -53,11 +55,10 @@ The quoting engine computes fair value using multiple market signals:
 - **Order Flow Imbalance (OFI)** derived from aggressor-side trades
 - **Inventory skew** based on current net position
 
-Rather than quoting around the simple top-of-book midpoint, Hermes prices around a VWAP-derived fair value and dynamically adjusts quotes based on recent trade pressure and inventory exposure.
-
-Generated bid and ask prices are then passed through a risk layer before being submitted to the exchange.
+Rather than quoting around the top-of-book midpoint, Hermes prices around estimated fair value and dynamically adjusts quotes based on recent trade pressure and inventory exposure.
 
 Strategy behavior includes:
+
 - configurable quote size and spread
 - inventory-aware quote skewing
 - directional quoting during strong one-sided flow
@@ -78,22 +79,19 @@ These checks execute inline with quote generation before any order is transmitte
 
 ---
 
-## Order Entry
+## Order Entry + Networking
 
 Hermes implements native **CME iLink3 / FIXP** order entry directly in RTL.
 
 The transmit path handles:
+
 - FIXP session negotiation / establishment
 - sequence tracking
 - heartbeat messaging
 - `NewOrderSingle`
 - `OrderCancelRequest`
 
-Orders are serialized directly into TCP/IP/Ethernet frames and transmitted to the exchange without any software networking stack in the path.
-
----
-
-## Networking + Infrastructure
+Orders are serialized directly into TCP/IP/Ethernet frames and transmitted without any software networking stack in the path.
 
 Supporting the trading engine is a fully custom hardware networking stack with RTL implementations of:
 
@@ -104,8 +102,6 @@ Supporting the trading engine is a fully custom hardware networking stack with R
 - TCP
 - ICMP
 - MDIO PHY configuration
-
-The design runs with independent RX/TX clock domains connected through asynchronous FIFOs and synchronizers for deterministic packet handling across the receive and transmit pipelines.
 
 Current hardware runs over **100 Mbps MII**, with **RGMII support implemented for future gigabit PHY hardware**.
 
