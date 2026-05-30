@@ -1022,11 +1022,16 @@ always_ff @(posedge tx_clk) begin
         tcp_flags_lat <= 0;
         tcp_ack_num_lat <= 0;
         tcp_payload_csum_lat <= 0;
-    end else if (sess_ctrl_start || iltx_start) begin
-        tcp_length_lat <= tcp_length_mux;
-        tcp_flags_lat <= tcp_flags_mux;
-        tcp_ack_num_lat <= tcp_ack_num_mux;
-        tcp_payload_csum_lat <= tcp_payload_csum_mux;
+    end else if (iltx_start) begin
+        tcp_length_lat <= iltx_tcp_length;
+        tcp_flags_lat <= iltx_flags;
+        tcp_ack_num_lat <= sess_ctrl_ack_num;
+        tcp_payload_csum_lat <= iltx_payload_csum;
+    end else if (sess_ctrl_start) begin
+        tcp_length_lat <= sess_ctrl_tcp_length;
+        tcp_flags_lat <= sess_ctrl_flags;
+        tcp_ack_num_lat <= sess_ctrl_ack_num;
+        tcp_payload_csum_lat <= sess_ctrl_payload_csum;
     end
 end
  
@@ -1221,6 +1226,20 @@ icmp_parser u_icmp_parser (
     .icmp_payload_done(icmp_payload_done),
     .icmp_error(icmp_error)
 );
+
+logic [5:0] tcprx_header_len_out;
+
+logic [15:0] rx_ack_advance_lat;
+always_ff @(posedge rx_clk) begin
+    if (rst_sync_rx) begin
+        rx_ack_advance_lat <= 0;
+    end else if (tcprx_header_valid) begin
+        if (tcp_segment_length > {10'b0, tcprx_header_len_out})
+            rx_ack_advance_lat <= (tcp_segment_length - {10'b0, tcprx_header_len_out}) + {15'h0, tcprx_rx_syn} + {15'h0, tcprx_rx_fin};
+        else
+            rx_ack_advance_lat <= {15'h0, tcprx_rx_syn} + {15'h0, tcprx_rx_fin};
+    end
+end
  
 tcp_rx u_tcp_rx (
     .rx_clk(rx_clk),
@@ -1228,6 +1247,7 @@ tcp_rx u_tcp_rx (
     .src_ip(ip_src),
     .dst_ip(ip_dest),
     .tcp_length(tcp_segment_length),
+    .header_len_out(tcprx_header_len_out),
     .data_in(ip_payload_data),
     .data_in_valid(tcp_ip_payload_valid),
     .data_in_last(tcp_ip_payload_done_rx),
@@ -1426,7 +1446,8 @@ tcp_session #(
     .init_seq(sess_init_seq),
     .tx_grant(sess_tx_grant),
     .established(sess_established),
-    .closed(sess_closed)
+    .closed(sess_closed),
+    .rx_ack_advance(rx_ack_advance_lat)
 );
  
 ilink_tx u_ilink_tx (
@@ -1513,7 +1534,8 @@ tcp_tx u_tcp_tx (
 logic [15:0] ip_total_len_lat;
 always_ff @(posedge tx_clk) begin
     if (rst_sync_tx) ip_total_len_lat <= 0;
-    else if (sess_ctrl_start || iltx_start) ip_total_len_lat <= tcp_length_mux + 16'd20;
+    else if (iltx_start) ip_total_len_lat <= iltx_tcp_length + 16'd20;
+    else if (sess_ctrl_start) ip_total_len_lat <= sess_ctrl_tcp_length + 16'd20;
     else if (icmp_tx_start) ip_total_len_lat <= rep_total_len;
 end
  

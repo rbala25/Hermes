@@ -275,6 +275,12 @@ assign next_tx_cnt = (payload_in_ready && state == s_tx && tx_cnt != msg_len - 8
 assign payload_in_last = (state == s_tx) && (tx_cnt == msg_len - 8'd1);
 assign payload_in_data = msg_buf[next_tx_cnt]; //putting bytes on wire
 //assign payload_in_last = (state == s_tx) && (next_tx_cnt == msg_len - 8'd1);
+
+logic tx_done_r;
+always_ff @(posedge clk) begin
+    if (rst) tx_done_r <= 0;
+    else tx_done_r <= tx_done;
+end
  
 assign flags = 8'h18; //always 0x18 (ack and psh) for data
 
@@ -499,11 +505,11 @@ always_ff @(posedge clk) begin
             end
             
             s_wait_done: begin
-                if (tx_done) begin
+                if (tx_done || tx_done_r) begin
                     state <= s_idle;
                     if (cur_msg == mtype_negotiate) est_pending <= 1;
                 end
-            end 
+            end
             
             default: state <= s_idle;
         endcase

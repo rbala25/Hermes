@@ -22,7 +22,7 @@
 
 
 module tcp_rx(
-        input logic rx_clk,
+    input logic rx_clk,
     input logic rst,
  
     input logic [31:0] src_ip,
@@ -50,7 +50,8 @@ module tcp_rx(
     output logic rx_ack,
     output logic rx_fin,
     output logic rx_rst,
-    output logic csum_error //pulse when checksum fails
+    output logic csum_error, //pulse when checksum fails
+    output logic [5:0] header_len_out
     );
  
 typedef enum logic [2:0] {
@@ -272,5 +273,7 @@ always_ff @(posedge rx_clk) begin
         endcase
     end
 end
+
+assign header_len_out = header_len;
 endmodule
  

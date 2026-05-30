@@ -57,7 +57,9 @@ module tcp_session #(
     output logic tx_grant, //high when established and tcp_tx is free
  
     output logic established,
-    output logic closed
+    output logic closed,
+    
+    input logic [15:0] rx_ack_advance
 );
  
 typedef enum logic [2:0] {
@@ -103,7 +105,7 @@ always_ff @(posedge clk) begin
         else if (tx_done) tx_busy <= 0;
  
         if (header_valid) begin
-              ack_num_r <= rx_seq_num + 32'd1; 
+              ack_num_r <= rx_seq_num + {16'h0, rx_ack_advance};
         end
  
         if (header_valid && rx_rst) begin
