@@ -190,10 +190,10 @@ logic [15:0] tcp_segment_length;
 assign tcp_segment_length = ip_total_len - {10'b0, ip_ihl, 2'b00};
  
 logic tcp_ip_payload_valid;
-assign tcp_ip_payload_valid = ip_payload_valid && (ip_protocol == 8'h06);
- 
+assign tcp_ip_payload_valid = ip_payload_valid && (ip_protocol == 8'h06) && (ip_dest == MY_IP);
+
 logic tcp_ip_payload_done_rx;
-assign tcp_ip_payload_done_rx = ip_payload_done && (ip_protocol == 8'h06);
+assign tcp_ip_payload_done_rx = ip_payload_done && (ip_protocol == 8'h06) && (ip_dest == MY_IP);
  
 logic [7:0] icmp_type; //icmp parser outputs
 logic [7:0] icmp_code;
@@ -499,16 +499,27 @@ always_ff @(posedge tx_clk) begin
     end
 end
  
-logic neg_response_meta, neg_response_tx; //synchronizing response pulses for ilink tx
+logic neg_response_toggle;
+always_ff @(posedge rx_clk) begin
+    if (rst_sync_rx) neg_response_toggle <= 0;
+    else if (ilrx_neg_response) neg_response_toggle <= ~neg_response_toggle;
+end
+
+logic neg_resp_tog_meta, neg_resp_tog_tx, neg_resp_tog_tx_r;
 always_ff @(posedge tx_clk) begin
     if (rst_sync_tx) begin
-        neg_response_meta <= 0;
-        neg_response_tx <= 0;
+        neg_resp_tog_meta <= 0;
+        neg_resp_tog_tx <= 0;
+        neg_resp_tog_tx_r <= 0;
     end else begin
-        neg_response_meta <= ilrx_neg_response;
-        neg_response_tx <= neg_response_meta;
+        neg_resp_tog_meta <= neg_response_toggle;
+        neg_resp_tog_tx <= neg_resp_tog_meta;
+        neg_resp_tog_tx_r <= neg_resp_tog_tx;
     end
 end
+
+logic neg_response_tx;
+assign neg_response_tx = neg_resp_tog_tx ^ neg_resp_tog_tx_r;
  
 logic estab_ack_meta, estab_ack_tx; //estab_ack pulse sync
 always_ff @(posedge tx_clk) begin
@@ -1634,6 +1645,13 @@ end
 assign led[0] = link_ready;
 assign led[1] = iltx_start_seen;
 assign led[2] = sess_established;
-assign led[3] = ethtx_done_seen;
+//assign led[3] = ethtx_done_seen;
+
+logic csum_err_seen;
+always_ff @(posedge rx_clk) begin
+    if (rst_sync_rx) csum_err_seen <= 0;
+    else if (tcprx_csum_error) csum_err_seen <= 1;
+end
+assign led[3] = csum_err_seen;
  
 endmodule

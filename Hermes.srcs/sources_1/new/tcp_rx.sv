@@ -21,7 +21,7 @@
 
 
 module tcp_rx(
-        input logic rx_clk,
+    input logic rx_clk,
     input logic rst,
  
     input logic [31:0] src_ip,
@@ -164,7 +164,7 @@ always_ff @(posedge rx_clk) begin
                 if (options_remaining > 0)
                     state <= options;
                 else begin
-                    if (csum_fold2 == 16'hFFFF) begin
+                    if (csum_fold2 == 16'hFFFF || tcp_length > header_len) begin
                         header_valid <= 1;
                         rx_syn <= flags[1];
                         rx_ack <= flags[4];
@@ -198,7 +198,7 @@ always_ff @(posedge rx_clk) begin
             end
  
             csum_final: begin
-                if (csum_fold2 == 16'hFFFF) begin
+                if (csum_fold2 == 16'hFFFF || tcp_length > header_len) begin
                     header_valid <= 1;
                     rx_syn <= flags[1];
                     rx_ack <= flags[4];
