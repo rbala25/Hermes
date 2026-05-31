@@ -521,16 +521,27 @@ end
 logic neg_response_tx;
 assign neg_response_tx = neg_resp_tog_tx ^ neg_resp_tog_tx_r;
  
-logic estab_ack_meta, estab_ack_tx; //estab_ack pulse sync
+logic estab_ack_toggle;
+always_ff @(posedge rx_clk) begin
+    if (rst_sync_rx) estab_ack_toggle <= 0;
+    else if (ilrx_estab_ack) estab_ack_toggle <= ~estab_ack_toggle;
+end
+
+logic estab_ack_tog_meta, estab_ack_tog_tx, estab_ack_tog_tx_r;
 always_ff @(posedge tx_clk) begin
     if (rst_sync_tx) begin
-        estab_ack_meta <= 0;
-        estab_ack_tx <= 0;
+        estab_ack_tog_meta <= 0;
+        estab_ack_tog_tx <= 0;
+        estab_ack_tog_tx_r <= 0;
     end else begin
-        estab_ack_meta <= ilrx_estab_ack;
-        estab_ack_tx <= estab_ack_meta;
+        estab_ack_tog_meta <= estab_ack_toggle;
+        estab_ack_tog_tx <= estab_ack_tog_meta;
+        estab_ack_tog_tx_r <= estab_ack_tog_tx;
     end
 end
+
+logic estab_ack_tx;
+assign estab_ack_tx = estab_ack_tog_tx ^ estab_ack_tog_tx_r;
  
 logic send_sequence_meta, send_sequence_tx;
 always_ff @(posedge tx_clk) begin

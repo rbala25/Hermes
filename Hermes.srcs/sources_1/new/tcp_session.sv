@@ -78,6 +78,8 @@ logic [31:0] keepalive_cnt;
 logic [31:0] ack_num_r; //ack num
 logic tx_busy; //tcp_tx is mid-segment
 logic remote_fin_seen; //set when remote initiates close
+
+logic ack_num_r_valid;
  
 always_ff @(posedge clk) begin
     if (rst) begin
@@ -97,6 +99,8 @@ always_ff @(posedge clk) begin
         closed <= 1;
         tx_grant <= 0;
         remote_fin_seen <= 0;
+        ack_num_r <= 0;
+        ack_num_r_valid <= 0;
     end else begin
         ctrl_start <= 0;
         load_seq <= 0;
@@ -105,7 +109,10 @@ always_ff @(posedge clk) begin
         else if (tx_done) tx_busy <= 0;
  
         if (header_valid) begin
-              ack_num_r <= rx_seq_num + {16'h0, rx_ack_advance};
+            if (!ack_num_r_valid || (rx_seq_num + {16'h0, rx_ack_advance} - ack_num_r) <= 32'h7FFFFFFF) begin
+                ack_num_r <= rx_seq_num + {16'h0, rx_ack_advance};
+                ack_num_r_valid <= 1;
+            end
         end
  
         if (header_valid && rx_rst) begin
