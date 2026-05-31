@@ -264,15 +264,15 @@ always_ff @(posedge rx_clk) begin
                 payload_valid <= data_in_valid;
                 if (data_in_valid && payload_ready) begin
                     payload_data <= data_in;
-                    if (data_in_last) begin
-                        state <= idle;
-                    end
+                end
+                if (data_in_last) begin
+                    state <= idle;
                 end
             end
         endcase
     end
 end
-
+ 
 assign header_len_out = header_len;
 endmodule
  
