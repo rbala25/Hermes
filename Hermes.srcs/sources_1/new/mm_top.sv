@@ -42,7 +42,7 @@ module mm_top #(
     parameter logic [63:0] OFI_SCALE = 64'd25000000,
     parameter logic [31:0] OFI_THRESHOLD = 32'd10,
     parameter logic [31:0] RETRANSMIT_CYCLES = 32'd25000000,
-    parameter logic [31:0] KEEPALIVE_CYCLES = 32'd125000000,
+    parameter logic [31:0] KEEPALIVE_CYCLES = 32'd6_250_000,
     parameter logic [255:0] HMAC_NEGOTIATE = 256'd0,
     parameter logic [255:0] HMAC_ESTABLISH = 256'd0
 )(
@@ -1721,6 +1721,12 @@ always_ff @(posedge tx_clk) begin
     end
 end
 
-assign led[1] = ilrx_neg_resp_seen_tx;
+//assign led[1] = ilrx_neg_resp_seen_tx;
+logic iltx_estab_seen;
+always_ff @(posedge tx_clk) begin
+    if (rst_sync_tx) iltx_estab_seen <= 0;
+    else if (iltx_ilink_established) iltx_estab_seen <= 1;
+end
+assign led[1] = iltx_estab_seen;
  
 endmodule

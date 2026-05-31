@@ -265,7 +265,6 @@ always_ff @(posedge rx_clk) begin
                 if (data_in_valid && payload_ready) begin
                     payload_data <= data_in;
                     if (data_in_last) begin
-                        payload_valid <= 0;
                         state <= idle;
                     end
                 end
